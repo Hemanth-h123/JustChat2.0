@@ -324,74 +324,6 @@ async function startServer() {
       return;
     }
 
-    // Fallback Simulated Peer Matchmaking: if queueing for > 3.5 seconds
-    const elapsed = Date.now() - (user.matchingStartedAt || Date.now());
-    if (elapsed > 3500) {
-      const simPeers = [
-        { id: 'sim_sam', name: 'CyberSam ⚡', verified: true, interests: ['coding', 'neon', 'gaming', 'lofi'] },
-        { id: 'sim_luna', name: 'LunaGamer 🌌', verified: true, interests: ['gaming', 'music', 'cosmic', 'anime'] },
-        { id: 'sim_matrix', name: 'NeoPioneer 🕶️', verified: true, interests: ['matrix', 'tech', 'coding', 'ai'] },
-        { id: 'sim_sophie', name: 'SophieVibe 🍷', verified: true, interests: ['lounge', 'music', 'travel', 'chat'] }
-      ];
-
-      // Prefer a peer with interest overlap
-      const candidates = simPeers.map(peer => {
-        const common = peer.interests.filter(i => user.interests.includes(i));
-        return { peer, score: common.length };
-      });
-      candidates.sort((a, b) => b.score - a.score);
-      const chosenPartner = candidates[0].peer;
-
-      // Seed the simulated peer in active users
-      if (!activeUsers.has(chosenPartner.id)) {
-        activeUsers.set(chosenPartner.id, {
-          id: chosenPartner.id,
-          name: chosenPartner.name,
-          ageVerified: true,
-          verified: true,
-          interests: chosenPartner.interests,
-          status: 'active',
-          roomId: null,
-          lastSeen: Date.now() + 1000 * 3600 * 24
-        });
-      }
-
-      const roomId = `room_sim_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      const newRoom: Room = {
-        id: roomId,
-        hostId: userId,
-        guestId: chosenPartner.id,
-        hostIce: [],
-        guestIce: [],
-        hostSdp: null,
-        guestSdp: null,
-        messages: [
-          {
-            id: `msg_welcome_${Date.now()}`,
-            sender: chosenPartner.id,
-            text: `Hey there! 👋 Glad we matched! What's up? I'm standard on interests like: ${chosenPartner.interests.slice(0, 3).join(', ')}.`,
-            time: Date.now()
-          }
-        ],
-        created: Date.now(),
-        lastActivity: Date.now()
-      };
-
-      rooms.set(roomId, newRoom);
-
-      user.status = 'active';
-      user.roomId = roomId;
-      user.matchingStartedAt = undefined;
-
-      const partnerObj = activeUsers.get(chosenPartner.id)!;
-      partnerObj.status = 'active';
-      partnerObj.roomId = roomId;
-
-      console.log(`[Server] Matched ${user.name} and Simulated Peer ${chosenPartner.name} in room ${roomId} for ${user.chatMode} chat`);
-      res.json({ success: true, state: 'matched', room: newRoom });
-      return;
-    }
-
     res.json({ success: true, state: 'matching' });
   });
 
@@ -585,32 +517,6 @@ async function startServer() {
 
     room.messages.push(newMessage);
 
-    // If the room is a simulated room with a chatbot partner, trigger automated replies
-    const isSimulatedRoom = room.id.startsWith('room_sim_') || room.guestId.startsWith('sim_') || room.hostId.startsWith('sim_');
-    if (isSimulatedRoom) {
-      const partnerId = room.hostId === userId ? room.guestId : room.hostId;
-      setTimeout(() => {
-        const simResponses = [
-          "That's so awesome! I'm completely vibing with this interaction.",
-          "Absolutely! Let's definitely discuss that more.",
-          "I think we have some exciting commonalities! What are your current side projects?",
-          "Oh tell me about it, completely agree on the interest overlaps!",
-          "Haha nice! Let's keep chatting or we can skip-match to other peers anytime.",
-          "Awesome. What kind of music do you listen to while coding?",
-          "That sounds super interesting, what did you learn recently?"
-        ];
-        const randomResponse = simResponses[Math.floor(Math.random() * simResponses.length)];
-        
-        room.messages.push({
-          id: `msg_bot_${Date.now()}`,
-          sender: partnerId,
-          text: randomResponse,
-          time: Date.now()
-        });
-        room.lastActivity = Date.now();
-      }, 1200);
-    }
-
     res.json({ success: true, message: newMessage });
   });
 
@@ -726,11 +632,11 @@ async function startServer() {
     app.use(vite.middlewares);
     console.log('[Server] Loaded Vite dev server middleware.');
   } else {
-    const buildPath = path.resolve(__dirname, 'dist');
+    const buildPath = path.join(process.cwd(), 'dist');
     app.use(express.static(buildPath));
     
     app.get('*', (req, res) => {
-      res.sendFile(path.resolve(buildPath, 'index.html'));
+      res.sendFile(path.join(buildPath, 'index.html'));
     });
     console.log('[Server] Set up to serve static assets from "/dist".');
   }

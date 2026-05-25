@@ -1257,7 +1257,7 @@ export default function App() {
             <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-teal-400 font-bold text-[9px] rounded-full uppercase tracking-widest font-mono shadow-sm shadow-teal-500/10">
               ⚡ WebRTC Hyper-Space Active
             </span>
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-mono bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-250 to-zinc-400">JustChat</h1>
+            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-mono drop-shadow-[0_4px_12px_rgba(255,255,255,0.1)]">JustChat</h1>
             <p className="text-xs sm:text-sm text-zinc-400 font-light max-w-md mx-auto">
               Dynamic matching on encrypted streams. Pick a connection protocol and align tag parameters to peer with the space.
             </p>
@@ -1978,7 +1978,7 @@ export default function App() {
                 <h4 className="font-bold text-teal-400 uppercase">Core Architecture details</h4>
                 <ul className="list-disc pl-4 space-y-1 text-zinc-400">
                   <li><strong>Instant Match Engine:</strong> Algorithmic pairing based on tag intersects.</li>
-                  <li><strong>Simulated Fallbacks:</strong> Integrated interactive chat AI agents when volume is low.</li>
+                  <li><strong>Authentic Connections:</strong> Direct human-to-human chats with no chatbots, AI bots, or fake filler entries.</li>
                   <li><strong>Custom Holographic Vibe Scenes:</strong> 3D canvas rendering supporting Cosmic, Neon, Lounge, and Matrix environments.</li>
                   <li><strong>P2P Media Protocols:</strong> Encrypted WebRTC streams.</li>
                 </ul>
