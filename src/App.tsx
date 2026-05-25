@@ -31,7 +31,18 @@ if (typeof window !== 'undefined') {
       event.stopPropagation();
     }
   });
+
 }
+
+// Safe API fetch helper to support static host deployments (like GitHub Pages proxying requests to an external self-hosted backend)
+const appFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const apiUrl = (import.meta as any).env.VITE_API_URL;
+  if (apiUrl && typeof input === 'string' && input.startsWith('/api')) {
+    const base = apiUrl.replace(/\/$/, '');
+    return window.fetch(base + input, init);
+  }
+  return window.fetch(input, init);
+};
 
 // -------------------------------------------------------------
 // THREE.JS 3D BACKGROUND COMPONENT (ADVANCED)
@@ -671,7 +682,7 @@ export default function App() {
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch('/api/status', {
+        const response = await appFetch('/api/status', {
           headers: { 'x-user-id': userId }
         });
         
@@ -744,7 +755,7 @@ export default function App() {
     const interval = setInterval(async () => {
       try {
         console.log(`[Queue] Checking matchmaking candidates for mode: ${chatMode}`);
-        const res = await fetch('/api/match', {
+        const res = await appFetch('/api/match', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
           body: JSON.stringify({ interests, chatMode })
@@ -792,7 +803,7 @@ export default function App() {
 
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          await fetch('/api/signal/send', {
+          await appFetch('/api/signal/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
             body: JSON.stringify({ ice: event.candidate, role })
@@ -803,7 +814,7 @@ export default function App() {
       if (role === 'host') {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        await fetch('/api/signal/send', {
+        await appFetch('/api/signal/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
           body: JSON.stringify({ sdp: offer, role })
@@ -826,7 +837,7 @@ export default function App() {
       }
 
       try {
-        const res = await fetch(`/api/signal/poll?role=${role}`, {
+        const res = await appFetch(`/api/signal/poll?role=${role}`, {
           headers: { 'x-user-id': userId }
         });
         const signal = await res.json();
@@ -836,7 +847,7 @@ export default function App() {
             await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            await fetch('/api/signal/send', {
+            await appFetch('/api/signal/send', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
               body: JSON.stringify({ sdp: answer, role })
@@ -875,7 +886,7 @@ export default function App() {
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch('/api/chat/messages', {
+      const res = await appFetch('/api/chat/messages', {
         headers: { 'x-user-id': userId }
       });
       const data = await res.json();
@@ -908,7 +919,7 @@ export default function App() {
         await setupMedia();
       }
 
-      await fetch('/api/match', {
+      await appFetch('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
         body: JSON.stringify({ interests, chatMode: mode })
@@ -930,13 +941,13 @@ export default function App() {
       setMessages([]);
       cleanupWebRTC();
 
-      await fetch('/api/skip', {
+      await appFetch('/api/skip', {
         method: 'POST',
         headers: { 'x-user-id': userId }
       });
 
       // Instantly start next match call on server
-      await fetch('/api/match', {
+      await appFetch('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
         body: JSON.stringify({ interests, chatMode })
@@ -959,7 +970,7 @@ export default function App() {
       setMessages([]);
       cleanupWebRTC();
 
-      await fetch('/api/end', {
+      await appFetch('/api/end', {
         method: 'POST',
         headers: { 'x-user-id': userId }
       });
@@ -976,7 +987,7 @@ export default function App() {
       setPartner(null);
       cleanupWebRTC();
 
-      await fetch('/api/disconnect', {
+      await appFetch('/api/disconnect', {
         method: 'POST',
         headers: { 'x-user-id': userId }
       });
@@ -994,7 +1005,7 @@ export default function App() {
       const textVal = messageInput;
       setMessageInput('');
 
-      const res = await fetch('/api/chat/send', {
+      const res = await appFetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
         body: JSON.stringify({ text: textVal })
@@ -1013,7 +1024,7 @@ export default function App() {
     if (!partner) return;
 
     try {
-      const res = await fetch('/api/report', {
+      const res = await appFetch('/api/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
         body: JSON.stringify({
@@ -1047,7 +1058,7 @@ export default function App() {
     const resolvedName = userName.trim() || 'Anonymous Human';
 
     try {
-      const res = await fetch('/api/register', {
+      const res = await appFetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1086,7 +1097,7 @@ export default function App() {
     setTimeout(() => {
       setVerificationStep('verified');
       setIsProfileVerified(true);
-      fetch('/api/verify', {
+      appFetch('/api/verify', {
         method: 'POST',
         headers: { 'x-user-id': userId }
       }).catch(err => console.warn(err));
