@@ -194,14 +194,30 @@ async function startServer() {
   // 3. Trigger profile verification status checkmark
   app.post('/api/verify', (req, res) => {
     const userId = req.headers['x-user-id'] as string;
-    if (!userId || !activeUsers.has(userId)) {
-       res.status(404).json({ error: "User not active" });
+    if (!userId) {
+       res.status(400).json({ error: "Missing session header" });
        return;
     }
 
-    const user = activeUsers.get(userId)!;
-    user.verified = true;
-    res.json({ success: true, user });
+    if (!activeUsers.has(userId)) {
+      // Register with default values
+      const newUser: User = {
+        id: userId,
+        name: 'Anonymous Human',
+        ageVerified: false,
+        verified: true,
+        interests: [],
+        status: 'idle',
+        roomId: null,
+        lastSeen: Date.now()
+      };
+      activeUsers.set(userId, newUser);
+      res.json({ success: true, user: newUser });
+    } else {
+      const user = activeUsers.get(userId)!;
+      user.verified = true;
+      res.json({ success: true, user });
+    }
   });
 
   // 4. Leave match or disconnect active room (Go back to idle)
