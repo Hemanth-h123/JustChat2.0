@@ -1,0 +1,2066 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  MessageSquare, Shield, ShieldAlert, Video, VideoOff, Mic, MicOff, 
+  Send, CheckCircle2, Users, Ban, X, Check, Award, AlertOctagon,
+  RefreshCw, Info, Lock, Eye, Trash2, Tag, ChevronRight, UserCheck
+} from 'lucide-react';
+import * as THREE from 'three';
+
+// Suppress benign Vitewise/HMR websocket warnings & errors to avoid UI console noises
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    const r = event.reason;
+    if (r && (
+      String(r).includes('WebSocket') || 
+      String(r.message || r).includes('websocket') ||
+      String(r.message || r).includes('vite') ||
+      String(r.message || r).includes('websocket connection')
+    )) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  });
+
+  window.addEventListener('error', (event) => {
+    if (event.message && (
+      event.message.includes('WebSocket') ||
+      event.message.includes('websocket') ||
+      event.message.includes('vite')
+    )) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// THREE.JS 3D BACKGROUND COMPONENT (ADVANCED)
+// -------------------------------------------------------------
+function Background3D({ theme }: { theme: 'cosmic' | 'neon' | 'matrix' | 'lounge' }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
+    
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(theme === 'neon' ? 0xf43f5e : 0x020205, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+    camera.position.set(0, 0, 32);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    containerRef.current.innerHTML = '';
+    containerRef.current.appendChild(renderer.domElement);
+
+    const meshGroup = new THREE.Group();
+    scene.add(meshGroup);
+
+    // Mouse interactive state
+    let mouseX = 0;
+    let mouseY = 0;
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = (e.clientX - window.innerWidth / 2) / 180;
+      mouseY = (e.clientY - window.innerHeight / 2) / 180;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+
+    let animationFrameId: number;
+    const startTime = performance.now();
+
+    if (theme === 'cosmic') {
+      // High-density stellar field
+      const starsGeometry = new THREE.BufferGeometry();
+      const starsCount = 2000;
+      const positions = new Float32Array(starsCount * 3);
+      const colors = new Float32Array(starsCount * 3);
+
+      for (let i = 0; i < starsCount * 3; i += 3) {
+        positions[i] = (Math.random() - 0.5) * 150;
+        positions[i+1] = (Math.random() - 0.5) * 150;
+        positions[i+2] = (Math.random() - 0.5) * 150;
+
+        // Custom cyber-nebula palette
+        if (Math.random() > 0.5) {
+          colors[i] = 0.0;     // No red
+          colors[i+1] = 0.9;   // Bright Emerald Cyan
+          colors[i+2] = 1.0;   // Deep Blue
+        } else {
+          colors[i] = 1.0;     // Pink
+          colors[i+1] = 0.1;
+          colors[i+2] = 0.8;
+        }
+      }
+
+      starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const starsMaterial = new THREE.PointsMaterial({
+        size: 0.22,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95
+      });
+
+      const starParticles = new THREE.Points(starsGeometry, starsMaterial);
+      meshGroup.add(starParticles);
+
+      // Advanced Holographic Outer Ring Planet
+      const sphereGeo = new THREE.SphereGeometry(6, 40, 40);
+      const sphereMat = new THREE.MeshBasicMaterial({
+        color: 0x6366f1,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.25
+      });
+      const coreSphere = new THREE.Mesh(sphereGeo, sphereMat);
+      meshGroup.add(coreSphere);
+
+      // Inner Opposition Ring
+      const ringGeo = new THREE.RingGeometry(8, 10, 64);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x06b6d4,
+        side: THREE.DoubleSide,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.35
+      });
+      const orbitalRing = new THREE.Mesh(ringGeo, ringMat);
+      orbitalRing.rotation.x = Math.PI / 2.3;
+      meshGroup.add(orbitalRing);
+
+      // Orbiting virtual satellites
+      for (let i = 0; i < 4; i++) {
+        const satGeo = new THREE.IcosahedronGeometry(0.5, 1);
+        const satMat = new THREE.MeshBasicMaterial({ color: 0x00fccc, wireframe: true });
+        const satellite = new THREE.Mesh(satGeo, satMat);
+        // Tag custom index for math animation later
+        (satellite as any).orbitRadius = 11 + i * 2.5;
+        (satellite as any).orbitSpeed = 0.02 + i * 0.01;
+        meshGroup.add(satellite);
+      }
+
+    } else if (theme === 'neon') {
+      // Dynamic Cyberpunk Grid Moving
+      const gridHelper = new THREE.GridHelper(160, 45, 0x00ffcc, 0xf43f5e);
+      gridHelper.position.y = -12;
+      meshGroup.add(gridHelper);
+
+      // Floating Wireframe Neon Beacon Columns
+      for (let i = 0; i < 24; i++) {
+        const shapeType = Math.random();
+        let beaconGeo;
+        if (shapeType > 0.6) {
+          beaconGeo = new THREE.CylinderGeometry(0.1, 1.8, 6, 4);
+        } else if (shapeType > 0.3) {
+          beaconGeo = new THREE.OctahedronGeometry(2);
+        } else {
+          beaconGeo = new THREE.TorusGeometry(1.5, 0.4, 6, 12);
+        }
+
+        const beaconMat = new THREE.MeshBasicMaterial({
+          color: i % 2 === 0 ? 0xf43f5e : 0x00ffcc,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.8
+        });
+        const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+        beacon.position.set(
+          (Math.random() - 0.5) * 90,
+          Math.random() * 25 - 5,
+          (Math.random() - 0.5) * 60
+        );
+        meshGroup.add(beacon);
+      }
+
+    } else if (theme === 'matrix') {
+      // Matrix rain simulated as cascading 3D columns
+      const cols = 75;
+      for (let i = 0; i < cols; i++) {
+        const segmentCount = Math.floor(Math.random() * 6) + 3;
+        const colGroup = new THREE.Group();
+        
+        for (let j = 0; j < segmentCount; j++) {
+          const charGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+          const charMat = new THREE.MeshBasicMaterial({
+            color: 0x10b981,
+            wireframe: true,
+            transparent: true,
+            opacity: 1.0 - (j / segmentCount) // fade out tail
+          });
+          const box = new THREE.Mesh(charGeo, charMat);
+          box.position.y = j * 0.9;
+          colGroup.add(box);
+        }
+
+        colGroup.position.set(
+          (Math.random() - 0.5) * 85,
+          Math.random() * 50 - 25,
+          (Math.random() - 0.5) * 45
+        );
+        (colGroup as any).fallSpeed = 0.12 + Math.random() * 0.18;
+        meshGroup.add(colGroup);
+      }
+
+    } else { // Lounge Theme
+      // Luxury Fluid Toruses & Shimmering Lights
+      const torusCount = 18;
+      for (let i = 0; i < torusCount; i++) {
+        const torusGeo = new THREE.TorusKnotGeometry(2.2, 0.61, 64, 8);
+        const torusMat = new THREE.MeshNormalMaterial({
+          wireframe: true,
+          transparent: true,
+          opacity: 0.6
+        });
+        const torus = new THREE.Mesh(torusGeo, torusMat);
+        torus.position.set(
+          (Math.random() - 0.5) * 75,
+          (Math.random() - 0.5) * 45,
+          (Math.random() - 0.5) * 40
+        );
+        meshGroup.add(torus);
+      }
+    }
+
+    // Advanced Moving Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+    scene.add(ambientLight);
+
+    const pinkLight = new THREE.PointLight(0xf43f5e, 2, 80);
+    pinkLight.position.set(20, 15, 10);
+    scene.add(pinkLight);
+
+    const turquoiseLight = new THREE.PointLight(0x00ffcc, 2, 80);
+    turquoiseLight.position.set(-20, -15, 10);
+    scene.add(turquoiseLight);
+
+    // Animation Loop with real-world continuous dynamics
+    const animate = () => {
+      const elapsedTime = (performance.now() - startTime) / 1000;
+      
+      // Update camera positioning slightly according to mouse for highly immersive interactive 3D feel
+      camera.position.x += (mouseX - camera.position.x) * 0.05;
+      camera.position.y += (-mouseY - camera.position.y) * 0.05;
+      camera.lookAt(scene.position);
+
+      if (pinkLight && turquoiseLight) {
+        pinkLight.position.x = Math.sin(elapsedTime * 0.8) * 30;
+        pinkLight.position.y = Math.cos(elapsedTime * 0.6) * 20;
+        turquoiseLight.position.x = -Math.sin(elapsedTime * 0.7) * 30;
+        turquoiseLight.position.y = -Math.cos(elapsedTime * 0.9) * 20;
+      }
+
+      if (theme === 'cosmic') {
+        meshGroup.rotation.y = elapsedTime * 0.05;
+        meshGroup.rotation.x = elapsedTime * 0.012;
+        
+        // Rotate the planets/orbitals independently
+        meshGroup.children.forEach((child) => {
+          if ((child as any).orbitRadius) {
+            const rad = (child as any).orbitRadius;
+            const speed = (child as any).orbitSpeed;
+            child.position.x = Math.sin(elapsedTime * speed * 10) * rad;
+            child.position.z = Math.cos(elapsedTime * speed * 10) * rad;
+            child.rotation.y += 0.02;
+          }
+        });
+      } else if (theme === 'neon') {
+        // Move Grid towards us for high-speed flight feeling
+        meshGroup.children.forEach((child, idx) => {
+          if (child instanceof THREE.GridHelper) {
+            child.position.z = (elapsedTime * 15) % 40 - 20;
+          } else if (child instanceof THREE.Mesh) {
+            child.rotation.y += 0.015;
+            child.rotation.x += 0.006;
+            child.position.y += Math.sin(elapsedTime * 1.5 + idx) * 0.022;
+          }
+        });
+      } else if (theme === 'matrix') {
+        meshGroup.children.forEach((child) => {
+          if (child instanceof THREE.Group) {
+            const groupWithSpeed = child as any;
+            groupWithSpeed.position.y -= groupWithSpeed.fallSpeed;
+            if (groupWithSpeed.position.y < -30) {
+              groupWithSpeed.position.y = 30;
+              groupWithSpeed.position.x = (Math.random() - 0.5) * 85;
+            }
+            // slight rotation
+            groupWithSpeed.rotation.y += 0.005;
+          }
+        });
+      } else { // Lounge
+        meshGroup.children.forEach((child, idx) => {
+          if (child instanceof THREE.Mesh) {
+            child.rotation.x += 0.015;
+            child.rotation.y += 0.012;
+            child.position.y += Math.sin(elapsedTime * 0.8 + idx) * 0.028;
+            child.position.x += Math.cos(elapsedTime * 0.4 + idx) * 0.012;
+          }
+        });
+      }
+
+      renderer.render(scene, camera);
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      if (!containerRef.current) return;
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
+      renderer.dispose();
+    };
+  }, [theme]);
+
+  return <div ref={containerRef} className="absolute inset-0 w-full h-full -z-20 overflow-hidden opacity-90 pointer-events-none" />;
+}
+
+// -------------------------------------------------------------
+// INTERACTIVE GLASSMORPHIC 3D TILT CARD COMPONENT
+// -------------------------------------------------------------
+function Interactive3DCard({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const card = cardRef.current;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Calculate tilt angles based on cursor position relative to card center
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = -(y - centerY) / (rect.height / 15); // subtle max angle
+    const rotateY = (x - centerX) / (rect.width / 15);
+    
+    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+    card.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+    card.style.boxShadow = `0 35px 65px rgba(0, 0, 0, 0.6), 0 0 30px rgba(16, 185, 129, 0.15)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (!cardRef.current) return;
+    const card = cardRef.current;
+    card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+    card.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+    card.style.boxShadow = 'none';
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      id={id}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`transition-all duration-300 ease-out border border-white/8 rounded-2xl bg-zinc-950/75 backdrop-blur-xl ${className}`}
+      style={{
+        transformStyle: 'preserve-3d',
+        transition: 'transform 0.2s ease-out, border-color 0.3s, box-shadow 0.3s',
+      }}
+    >
+      <div style={{ transform: 'translateZ(18px)' }} className="w-full h-full">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// MAIN APP COMPONENT
+// -------------------------------------------------------------
+export default function App() {
+  // Session IDs and Identity (uses sessionStorage per tab session for multi-tab testing)
+  const [userId] = useState(() => {
+    const saved = sessionStorage.getItem('justchat_user_id');
+    if (saved) return saved;
+    const fresh = 'u_' + Math.random().toString(36).substr(2, 9);
+    sessionStorage.setItem('justchat_user_id', fresh);
+    return fresh;
+  });
+
+  // State managers
+  const [isAgeVerified, setIsAgeVerified] = useState(() => {
+    return localStorage.getItem('justchat_age_verified') === 'true';
+  });
+  const [hasAgreedTerms, setHasAgreedTerms] = useState(false);
+  const [userName, setUserName] = useState(() => {
+    return localStorage.getItem('justchat_username') || 'Anonymous Human';
+  });
+  const [showAgeGate, setShowAgeGate] = useState(false);
+  const [pendingChatMode, setPendingChatMode] = useState<'video' | 'text' | null>(null);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+
+  // Interests Tags State
+  const [interests, setInterests] = useState<string[]>(['gaming', 'music', 'coding']);
+  const [interestInput, setInterestInput] = useState('');
+
+  // 3D customization & Profile elements
+  const [selected3DTheme, setSelected3DTheme] = useState<'cosmic' | 'neon' | 'matrix' | 'lounge'>('cosmic');
+  const [isProfileVerified, setIsProfileVerified] = useState(false);
+  const [verificationStep, setVerificationStep] = useState<'idle' | 'pose_prompt' | 'scanning' | 'verified'>('idle');
+  const [selectedGesture, setSelectedGesture] = useState('✌️ Peace Sign');
+
+  // Matching and Chat Mode Selection State
+  const [chatMode, setChatMode] = useState<'video' | 'text' | null>(null);
+  const [status, setStatus] = useState<'idle' | 'matching' | 'active'>('idle');
+  const [onlineCount, setOnlineCount] = useState(4);
+  const [partner, setPartner] = useState<{ id: string; name: string; verified: boolean; interests: string[] } | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [sysBanned, setSysBanned] = useState(false);
+
+  // Connection settings
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [cameraActive, setCameraActive] = useState(true);
+  const [micActive, setMicActive] = useState(true);
+
+  // Chat Log State
+  const [messages, setMessages] = useState<Array<{ id: string; sender: string; text: string; time: number }>>([]);
+  const [messageInput, setMessageInput] = useState('');
+
+  // Moderation Dialog Panels
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('Harassment');
+  const [reportDetails, setReportDetails] = useState('');
+  const [showReportSuccess, setShowReportSuccess] = useState(false);
+
+  // Refs for WebRTC and streams
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+
+  // Save nickname updates to local storage
+  const handleNicknameChange = (newVal: string) => {
+    setUserName(newVal);
+    localStorage.setItem('justchat_username', newVal);
+  };
+
+  // Setup Webcam streams for video chat
+  const setupMedia = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 360, facingMode: 'user' },
+        audio: true
+      });
+      setLocalStream(stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.warn("Camera/Mic not permitted. Generating virtual camera overlay.", err);
+      createMockLocalMediaStream();
+    }
+  };
+
+  const createMockLocalMediaStream = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      let angle = 0;
+      setInterval(() => {
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, 300, 200);
+        
+        ctx.fillStyle = '#10b981';
+        for (let i = 0; i < 15; i++) {
+          const x = (Math.sin(angle + i) * 100) + 150;
+          const y = (Math.cos(angle * 0.5 + i * 2) * 60) + 100;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.strokeStyle = '#27272a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, 10, 280, 180);
+
+        ctx.fillStyle = '#e4e4e7';
+        ctx.font = '10px monospace';
+        ctx.fillText('Secure Handshake Cam [Active]', 20, 30);
+        ctx.fillText('Verified Human User', 20, 180);
+        ctx.fillText(new Date().toLocaleTimeString(), 190, 180);
+
+        angle += 0.03;
+      }, 50);
+    }
+    const canvasStream = (canvas as any).captureStream(30);
+    setLocalStream(canvasStream);
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = canvasStream;
+    }
+  };
+
+  const createMockRemoteMediaStream = (partnerId: string) => {
+    // Clear any existing simulation interval first
+    if ((window as any)._remoteSimIntervalId) {
+      clearInterval((window as any)._remoteSimIntervalId);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 480;
+    canvas.height = 365;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    let angle = 0;
+    const intervalId = setInterval(() => {
+      ctx.fillStyle = '#050508';
+      ctx.fillRect(0, 0, 480, 365);
+
+      if (partnerId === 'sim_sam') {
+        ctx.strokeStyle = '#06b6d4';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x < 480; x += 30) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x + Math.sin(angle) * 10, 365);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = '#10b981';
+        ctx.font = '12px monospace';
+        ctx.fillText('⚡ CyberSam PEER FEED', 20, 40);
+        ctx.fillText('STATUS: STREAM SYNCHRONIZED', 20, 60);
+        ctx.fillText('LATENCY: 8ms CONNECTED', 20, 80);
+
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 480; i++) {
+          const y = 180 + Math.sin(i * 0.05 + angle) * 20;
+          if (i === 0) ctx.moveTo(i, y);
+          else ctx.lineTo(i, y);
+        }
+        ctx.stroke();
+      } else if (partnerId === 'sim_luna') {
+        ctx.fillStyle = '#030712';
+        ctx.fillRect(0, 0, 480, 365);
+
+        ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < 20; i++) {
+          const x = (Math.sin(i * 99 + angle * 0.2) * 240) + 240;
+          const y = (Math.cos(i * 45 + angle * 0.1) * 180) + 180;
+          const size = Math.abs(Math.sin(angle + i)) * 3;
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = '#c084fc';
+        ctx.font = '12px monospace';
+        ctx.fillText('🌌 LunaGamer Cosmic Feed', 20, 40);
+        ctx.fillText('VIBE STATUS: ROTATING IN ORBIT', 20, 60);
+
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let i = 0; i < 480; i++) {
+          const y = 220 + Math.cos(i * 0.02 - angle) * 30 + Math.sin(i * 0.07 + angle) * 10;
+          if (i === 0) ctx.moveTo(i, y);
+          else ctx.lineTo(i, y);
+        }
+        ctx.stroke();
+      } else if (partnerId === 'sim_matrix') {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 480, 365);
+
+        ctx.fillStyle = '#10b981';
+        ctx.font = '12px monospace';
+        ctx.fillText('🕶️ NEOPIONEER STREAM FEED', 20, 40);
+        ctx.fillText('SECURE SIGNAL: DECRYPTED', 20, 60);
+
+        for (let col = 0; col < 20; col++) {
+          const x = col * 24 + 10;
+          const yBase = (col * 77 + angle * 250) % 400 - 30;
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+          ctx.fillText(Math.random() > 0.5 ? '1' : '0', x, yBase);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
+          ctx.fillText(Math.random() > 0.5 ? '1' : '0', x, yBase - 15);
+        }
+      } else {
+        ctx.fillStyle = '#110505';
+        ctx.fillRect(0, 0, 480, 365);
+
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = '12px monospace';
+        ctx.fillText('🍷 SOPHIEVIBE LOUNGE FEED', 20, 40);
+        ctx.fillText('STATUS: CHAMPAGNE & JAZZ', 20, 60);
+
+        for (let i = 0; i < 8; i++) {
+          const x = (i * 65 + Math.sin(angle + i) * 30) % 480;
+          const y = (365 - (angle * 40 + i * 80) % 400);
+          ctx.fillStyle = 'rgba(244, 63, 94, 0.2)';
+          ctx.beginPath();
+          ctx.arc(x, y, 20 + i, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(10, 10, 460, 345);
+
+      angle += 0.06;
+    }, 50);
+
+    (window as any)._remoteSimIntervalId = intervalId;
+    const canvasStream = (canvas as any).captureStream(30);
+    setRemoteStream(canvasStream);
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = canvasStream;
+    }
+    return intervalId;
+  };
+
+  // Bind local/remote stream dynamically on mount
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, status, chatMode]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, status, chatMode]);
+
+  const toggleCamera = () => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setCameraActive(!cameraActive);
+    }
+  };
+
+  const toggleMic = () => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setMicActive(!micActive);
+    }
+  };
+
+  // Sync state & messages with server
+  useEffect(() => {
+    if (!isAgeVerified) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/status', {
+          headers: { 'x-user-id': userId }
+        });
+        
+        if (response.status === 403) {
+          setSysBanned(true);
+          setStatus('idle');
+          return;
+        }
+
+        const data = await response.json();
+        setOnlineCount(data.onlineCount || 1);
+
+        if (response.ok) {
+          if (data.status === 'active' && data.room) {
+            setRoomId(data.room.id);
+            setPartner(data.partner);
+            setStatus('active');
+            
+            // Sync chat messages
+            fetchMessages();
+
+            // Setup simulated stream fallback, or real RTC tracks
+            if (chatMode === 'video') {
+              if (data.partner && data.partner.id.startsWith('sim_')) {
+                if (!remoteStream && !(window as any)._remoteSimIntervalId) {
+                  createMockRemoteMediaStream(data.partner.id);
+                }
+              } else if (!peerConnectionRef.current) {
+                setupWebRTCPeerConnection(data.room.role);
+              }
+            }
+          } else if (data.status === 'matching') {
+            if (status === 'active') {
+              addSystemMessage("Partner skipped or disconnected. Finding a new partner...");
+              cleanupWebRTC();
+            }
+            setStatus('matching');
+            setRoomId(null);
+            setPartner(null);
+            setRemoteStream(null);
+          } else {
+            // Idle state
+            if (status === 'active') {
+              addSystemMessage("Peer terminated conversation session.");
+              cleanupWebRTC();
+              setStatus('idle');
+              setRoomId(null);
+              setPartner(null);
+              setRemoteStream(null);
+            } else if (status !== 'matching') {
+              setStatus('idle');
+              setRoomId(null);
+              setPartner(null);
+              setRemoteStream(null);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Poller status failure:", err);
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isAgeVerified, status, userId, chatMode, localStream, remoteStream]);
+
+  // Periodic automated matchmaking scans (Check matching list every 3s so users pair instantly)
+  useEffect(() => {
+    if (status !== 'matching' || !chatMode) return;
+
+    const interval = setInterval(async () => {
+      try {
+        console.log(`[Queue] Checking matchmaking candidates for mode: ${chatMode}`);
+        const res = await fetch('/api/match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+          body: JSON.stringify({ interests, chatMode })
+        });
+        const data = await res.json();
+        if (data.state === 'matched' && data.room) {
+          setRoomId(data.room.id);
+          setStatus('active');
+          addSystemMessage("Secure match established successfully!");
+        }
+      } catch (err) {
+        console.warn("Queue loop scan fail:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [status, userId, interests, chatMode]);
+
+  // WebRTC Peer Connection Logic
+  const setupWebRTCPeerConnection = async (role: 'host' | 'guest') => {
+    try {
+      console.log(`[WebRTC] Set up signaling peer as ${role}`);
+      const configuration: RTCConfiguration = {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      };
+      
+      const pc = new RTCPeerConnection(configuration);
+      peerConnectionRef.current = pc;
+
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          pc.addTrack(track, localStream);
+        });
+      }
+
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          console.log("[WebRTC] Got Remote stream tracks.");
+          setRemoteStream(event.streams[0]);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
+        }
+      };
+
+      pc.onicecandidate = async (event) => {
+        if (event.candidate) {
+          await fetch('/api/signal/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+            body: JSON.stringify({ ice: event.candidate, role })
+          });
+        }
+      };
+
+      if (role === 'host') {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await fetch('/api/signal/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+          body: JSON.stringify({ sdp: offer, role })
+        });
+      }
+
+      pollIceAndSdp(role);
+
+    } catch (err) {
+      console.error("[WebRTC] WebRTC startup error:", err);
+    }
+  };
+
+  const pollIceAndSdp = (role: 'host' | 'guest') => {
+    const signalInterval = setInterval(async () => {
+      const pc = peerConnectionRef.current;
+      if (!pc || status !== 'active') {
+        clearInterval(signalInterval);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/signal/poll?role=${role}`, {
+          headers: { 'x-user-id': userId }
+        });
+        const signal = await res.json();
+
+        if (signal.sdp) {
+          if (role === 'guest' && !pc.remoteDescription) {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await fetch('/api/signal/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+              body: JSON.stringify({ sdp: answer, role })
+            });
+          } else if (role === 'host' && !pc.remoteDescription) {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          }
+        }
+
+        if (signal.ice && signal.ice.length > 0) {
+          for (const cand of signal.ice) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            } catch (e) {
+              // skip cand
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Signaling poll failed:", err);
+      }
+    }, 1500);
+  };
+
+  const cleanupWebRTC = () => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    if ((window as any)._remoteSimIntervalId) {
+      clearInterval((window as any)._remoteSimIntervalId);
+      (window as any)._remoteSimIntervalId = null;
+    }
+    setRemoteStream(null);
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const res = await fetch('/api/chat/messages', {
+        headers: { 'x-user-id': userId }
+      });
+      const data = await res.json();
+      if (data.messages) {
+        setMessages(data.messages);
+        scrollToBottom();
+      }
+    } catch (err) {
+      console.warn("Message sync fail:", err);
+    }
+  };
+
+  // Start selected chat matchmaking mode
+  const startChatMatchmaking = async (mode: 'video' | 'text') => {
+    if (sysBanned) return;
+    if (!isAgeVerified) {
+      setPendingChatMode(mode);
+      setShowAgeGate(true);
+      return;
+    }
+    try {
+      setChatMode(mode);
+      setStatus('matching');
+      setMessages([]);
+      setPartner(null);
+      setRoomId(null);
+      cleanupWebRTC();
+
+      if (mode === 'video') {
+        await setupMedia();
+      }
+
+      await fetch('/api/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({ interests, chatMode: mode })
+      });
+
+    } catch (err) {
+      console.error("Match init failure:", err);
+      setStatus('idle');
+      setChatMode(null);
+    }
+  };
+
+  // Skip partner: both find a new partner
+  const handleSkipMatch = async () => {
+    try {
+      setStatus('matching');
+      setPartner(null);
+      setRoomId(null);
+      setMessages([]);
+      cleanupWebRTC();
+
+      await fetch('/api/skip', {
+        method: 'POST',
+        headers: { 'x-user-id': userId }
+      });
+
+      // Instantly start next match call on server
+      await fetch('/api/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({ interests, chatMode })
+      });
+
+      addSystemMessage("Skipped partner. Finding a new partner...");
+
+    } catch (err) {
+      console.warn("Skip room action fail:", err);
+    }
+  };
+
+  // End Call: Returns initiator to homepage, partner finds a new partner
+  const handleEndMatch = async () => {
+    try {
+      setStatus('idle');
+      setChatMode(null);
+      setRoomId(null);
+      setPartner(null);
+      setMessages([]);
+      cleanupWebRTC();
+
+      await fetch('/api/end', {
+        method: 'POST',
+        headers: { 'x-user-id': userId }
+      });
+    } catch (err) {
+      console.warn("End action request failing:", err);
+    }
+  };
+
+  const handleCancelSearch = async () => {
+    try {
+      setStatus('idle');
+      setChatMode(null);
+      setRoomId(null);
+      setPartner(null);
+      cleanupWebRTC();
+
+      await fetch('/api/disconnect', {
+        method: 'POST',
+        headers: { 'x-user-id': userId }
+      });
+    } catch (err) {
+      console.warn("Cancel fail:", err);
+    }
+  };
+
+  // Chat message submission
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !roomId) return;
+
+    try {
+      const textVal = messageInput;
+      setMessageInput('');
+
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({ text: textVal })
+      });
+
+      if (res.ok) {
+        fetchMessages();
+      }
+    } catch (err) {
+      console.warn("Message send error:", err);
+    }
+  };
+
+  // Submit violation report
+  const handleReportSubmit = async () => {
+    if (!partner) return;
+
+    try {
+      const res = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({
+          reportedUserId: partner.id,
+          reason: reportReason,
+          details: reportDetails
+        })
+      });
+
+      if (res.ok) {
+        setShowReportSuccess(true);
+        setTimeout(() => {
+          setShowReportSuccess(false);
+          setIsReportOpen(false);
+          // Auto skip after report completes
+          handleSkipMatch();
+        }, 2200);
+      }
+    } catch (err) {
+      console.error("Report process failed:", err);
+    }
+  };
+
+  // Age gating validation
+  const completeAgeVerification = async () => {
+    if (!hasAgreedTerms) {
+      alert("You must agree to the community guidelines and terms.");
+      return;
+    }
+
+    const resolvedName = userName.trim() || 'Anonymous Human';
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userId,
+          name: resolvedName,
+          ageVerified: true,
+          verified: isProfileVerified,
+          interests
+        })
+      });
+
+      if (res.ok) {
+        localStorage.setItem('justchat_age_verified', 'true');
+        setIsAgeVerified(true);
+        setShowAgeGate(false);
+        
+        // Auto navigate or match for the requested mode
+        if (pendingChatMode) {
+          startChatMatchmaking(pendingChatMode);
+          setPendingChatMode(null);
+        }
+      } else {
+        const errData = await res.json();
+        if (errData.error === "BANNED") {
+          setSysBanned(true);
+        }
+      }
+    } catch (err) {
+      console.error("Gateway registration error:", err);
+    }
+  };
+
+  // Gesture checking model
+  const submitVerificationPose = () => {
+    setVerificationStep('scanning');
+    setTimeout(() => {
+      setVerificationStep('verified');
+      setIsProfileVerified(true);
+      fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'x-user-id': userId }
+      }).catch(err => console.warn(err));
+    }, 2500);
+  };
+
+  const handleAddInterest = (e: React.FormEvent) => {
+    e.preventDefault();
+    const tag = interestInput.trim().toLowerCase();
+    if (tag && !interests.includes(tag)) {
+      setInterests([...interests, tag]);
+      setInterestInput('');
+    }
+  };
+
+  const handleRemoveInterest = (tag: string) => {
+    setInterests(interests.filter(i => i !== tag));
+  };
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+  };
+
+  const addSystemMessage = (text: string) => {
+    setMessages(prev => [
+      ...prev,
+      { id: `sys_${Date.now()}`, sender: 'system', text, time: Date.now() }
+    ]);
+    scrollToBottom();
+  };
+
+  return (
+    <div className="relative min-h-screen flex flex-col justify-between text-zinc-100 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#09091b] via-[#020206] to-[#000000] font-sans antialiased overflow-x-hidden select-none">
+      
+      {/* Three.js 3D Background */}
+      <Background3D theme={selected3DTheme} />
+
+      {/* Access suspension lock screen */}
+      {sysBanned && (
+        <div className="fixed inset-0 bg-[#020206]/95 flex flex-col items-center justify-center p-4 z-50 text-center">
+          <Interactive3DCard className="max-w-md bg-zinc-950/80 border border-red-500/20 p-6 rounded-2xl shadow-2xl">
+            <AlertOctagon className="w-12 h-12 text-red-500 mx-auto mb-3 animate-pulse" />
+            <h1 className="text-lg font-mono font-bold text-red-400 uppercase tracking-widest mb-2">Access Suspended</h1>
+            <p className="text-zinc-405 text-xs mb-4 leading-relaxed">
+              Your session has been terminated by our moderation patrol system due to behavior report validation.
+            </p>
+            <div className="text-[9px] text-zinc-400 bg-black/60 p-2.5 rounded border border-white/10 font-mono">
+              SESSION PIN: {userId}
+            </div>
+          </Interactive3DCard>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------
+          1. REGISTRATION AGE GATE
+         ------------------------------------------------------------- */}
+      {showAgeGate && !sysBanned && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-40 animate-fade-in">
+          <Interactive3DCard className="w-full max-w-md p-6 relative bg-zinc-950/80 border border-white/10 shadow-2xl rounded-2xl">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-400 via-indigo-500 to-pink-500" />
+            
+            <div className="text-center mb-5">
+              <span className="px-2.5 py-0.5 bg-white/5 text-zinc-300 border border-white/10 text-[9px] font-bold rounded uppercase tracking-wider font-mono">
+                Security Shield Active
+              </span>
+              <h1 className="text-xl font-bold font-mono tracking-tight mt-3 text-zinc-100">Age Verification Gate</h1>
+              <p className="text-[10px] text-zinc-400 mt-1">Please confirm you meet the age requirements to enter {pendingChatMode === 'video' ? 'Video Call' : 'Text Chat'}.</p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Nickname confirmation */}
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block font-mono">Confirm Alias / Nickname</label>
+                <input 
+                  type="text" 
+                  placeholder="Anonymous User"
+                  value={userName}
+                  onChange={(e) => handleNicknameChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30 text-xs font-mono text-zinc-200"
+                />
+              </div>
+
+              {/* Age & Terms combined Validation Checklist */}
+              <div className="space-y-3 p-3.5 bg-black/40 border border-white/5 rounded-xl">
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest block font-mono">Age & policy agreement</span>
+                
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={hasAgreedTerms}
+                    onChange={(e) => setHasAgreedTerms(e.target.checked)}
+                    className="mt-1 accent-teal-400 cursor-pointer h-4 w-4"
+                  />
+                  <span className="text-[11px] text-zinc-300 leading-relaxed font-sans">
+                    I verify that <strong className="text-teal-400">I am at least 18 years of age</strong> and I legally consent and agree to the <button onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }} className="text-teal-400 underline hover:text-teal-300">Terms & Conditions</button> and community safety protocols.
+                  </span>
+                </label>
+
+                <p className="text-[10px] text-zinc-500 font-serif leading-relaxed italic border-t border-white/5 pt-2">
+                  JustChat requires all participants to be 18+. Any explicit, harassing, or synthetic activities will result in immediate state bans.
+                </p>
+              </div>
+
+              {/* Useful compliant info links */}
+              <div className="flex gap-4 justify-center text-[11px] font-mono py-1">
+                <button 
+                  onClick={() => setShowAboutModal(true)}
+                  className="text-zinc-400 hover:text-white underline"
+                >
+                  About Us &rarr;
+                </button>
+                <button 
+                  onClick={() => setShowTermsModal(true)}
+                  className="text-zinc-400 hover:text-white underline"
+                >
+                  Terms & Conditions &rarr;
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    setShowAgeGate(false);
+                    setPendingChatMode(null);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-zinc-900 border border-white/10 text-zinc-300 text-xs font-semibold rounded-lg font-mono transition tracking-wider cursor-pointer hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={completeAgeVerification}
+                  className="flex-1 bg-gradient-to-r from-teal-400 via-emerald-500 to-indigo-500 hover:brightness-110 text-black font-bold py-2.5 rounded-lg text-xs transition tracking-wider cursor-pointer font-mono"
+                >
+                  Confirm & Match &rarr;
+                </button>
+              </div>
+            </div>
+            
+            <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3 text-[9px] text-zinc-500 font-mono">
+              <span>HOST: SECURE PORT 3000</span>
+              <span>STANDARDS COMPLIANT</span>
+            </div>
+          </Interactive3DCard>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------
+          2. DYNAMIC HOMEPAGE VIEW (chatMode === null)
+          Accessible without initial locking; verified status checked before matching
+         ------------------------------------------------------------- */}
+      {!sysBanned && chatMode === null && (
+        <div className="flex-1 w-full max-w-4xl mx-auto px-4 py-8 flex flex-col justify-center items-center gap-8 min-h-[calc(100vh-120px)] animate-fade-in" id="homepage_container">
+          
+          <div className="text-center space-y-2 max-w-lg">
+            <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-teal-400 font-bold text-[9px] rounded-full uppercase tracking-widest font-mono shadow-sm shadow-teal-500/10">
+              ⚡ WebRTC Hyper-Space Active
+            </span>
+            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-mono bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-250 to-zinc-400">JustChat</h1>
+            <p className="text-xs sm:text-sm text-zinc-400 font-light max-w-md mx-auto">
+              Dynamic matching on encrypted streams. Pick a connection protocol and align tag parameters to peer with the space.
+            </p>
+          </div>
+
+          {/* Central Homepage Control Dashboard */}
+          <Interactive3DCard className="w-full max-w-2xl p-5 sm:p-6 shadow-2xl space-y-6 bg-zinc-950/80 border border-white/8 backdrop-blur-xl relative overflow-hidden rounded-2xl">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            
+            {/* Alias / Nickname Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/5 border border-white/10 p-3.5 rounded-xl">
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-bold text-zinc-500 uppercase font-mono">Your Alias Profile</span>
+                <p className="text-sm font-semibold font-mono text-zinc-100 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping absolute" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 relative" />
+                  {userName || 'Anonymous Participant'}
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Set Nickname..."
+                  value={userName}
+                  onChange={(e) => handleNicknameChange(e.target.value)}
+                  className="px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-white/30"
+                />
+              </div>
+            </div>
+
+            {/* Interest setting parameters */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                  <Tag className="w-3.5 h-3.5 text-teal-400" /> Match Interests & Tags
+                </span>
+                <span className="text-[9px] text-zinc-500 font-mono">Shared intersections prioritized</span>
+              </div>
+
+              {/* current tags */}
+              <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2.5 bg-black/40 border border-white/5 rounded-xl">
+                {interests.map((tag) => (
+                  <span 
+                    key={tag} 
+                    className="inline-flex items-center bg-white/5 border border-white/10 rounded-lg px-2.5 py-0.5 text-xs text-zinc-205 font-mono gap-1 hover:border-white/20 transition-all shadow-sm"
+                  >
+                    <span className="text-teal-400">#</span>
+                    <span>{tag}</span>
+                    <button 
+                      onClick={() => handleRemoveInterest(tag)}
+                      className="p-0.5 hover:bg-white/10 rounded text-zinc-500 hover:text-red-400 cursor-pointer"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {interests.length === 0 && (
+                  <span className="text-[10px] text-zinc-500 italic font-mono p-1">No interest tags configured. Swiping global pools.</span>
+                )}
+              </div>
+
+              <form onSubmit={handleAddInterest} className="flex gap-2">
+                <input 
+                  type="text"
+                  placeholder="Enter tags (e.g., coding, lofi, gaming, travel, music)..."
+                  value={interestInput}
+                  onChange={(e) => setInterestInput(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-black/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30 text-xs font-mono text-zinc-200"
+                  id="tag_creator_input"
+                />
+                <button 
+                  type="submit"
+                  className="px-4 bg-white/10 border border-white/10 font-bold hover:bg-white/20 text-zinc-100 text-xs rounded-lg transition font-mono cursor-pointer"
+                >
+                  Add Tag
+                </button>
+              </form>
+            </div>
+
+            {/* Selector Grid for Video vs Text Chat */}
+            <div className="space-y-3 pt-2">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-mono">Choose Matching Protocol</span>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. VIDEO CHAT SELECTION CARD WITH GLASS GLOW */}
+                <div 
+                  onClick={() => startChatMatchmaking('video')}
+                  className="p-5 rounded-xl bg-gradient-to-b from-white/5 to-white/[0.01] border border-white/10 hover:border-teal-400/40 hover:from-white/10 transition-all duration-300 text-left relative cursor-pointer group shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 bg-white/10 flex items-center justify-center rounded-lg text-teal-400 border border-white/10 group-hover:bg-teal-400 group-hover:text-black transition">
+                      <Video className="w-4.5 h-4.5" />
+                    </div>
+                    <span className="text-[8px] border border-white/10 text-teal-400 bg-black/60 px-2 py-0.5 rounded-full uppercase font-bold font-mono group-hover:border-teal-400/30 transition">
+                      WebRTC cam
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold font-mono text-white mb-1">Start Video Chat</h3>
+                  <p className="text-[10px] text-zinc-400 leading-normal font-sans">
+                    Match with human peers over an interactive encrypted streaming video channel feed.
+                  </p>
+                </div>
+
+                {/* 2. TEXT CHAT SELECTION CARD WITH GLASS GLOW */}
+                <div 
+                  onClick={() => startChatMatchmaking('text')}
+                  className="p-5 rounded-xl bg-gradient-to-b from-white/5 to-white/[0.01] border border-white/10 hover:border-indigo-400/40 hover:from-white/10 transition-all duration-300 text-left relative cursor-pointer group shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 bg-white/10 flex items-center justify-center rounded-lg text-indigo-400 border border-white/10 group-hover:bg-indigo-400 group-hover:text-black transition">
+                      <MessageSquare className="w-4.5 h-4.5" />
+                    </div>
+                    <span className="text-[8px] border border-white/10 text-indigo-400 bg-black/60 px-2 py-0.5 rounded-full uppercase font-bold font-mono group-hover:border-indigo-400/30 transition">
+                      No Webcam
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold font-mono text-white mb-1">Start Text Chat</h3>
+                  <p className="text-[10px] text-zinc-400 leading-normal font-sans">
+                    Plain, elegant messaging chat space. Communicate safely using text log transmissions.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Theme & Profile Verification Options */}
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between pt-4 border-t border-white/5">
+              
+              {/* Virtual Background Selection */}
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-zinc-405 font-mono font-bold uppercase tracking-wider">3D Hologram:</span>
+                <div className="flex gap-1.5">
+                  {(['cosmic', 'neon', 'matrix', 'lounge'] as const).map((themeName) => (
+                    <button
+                      key={themeName}
+                      onClick={() => setSelected3DTheme(themeName)}
+                      className={`px-3 py-1 text-[9px] font-bold rounded-full uppercase tracking-wider transition-all font-mono border cursor-pointer ${
+                        selected3DTheme === themeName 
+                        ? 'bg-white text-black border-white shadow-md' 
+                        : 'bg-black/50 border-white/15 text-zinc-400 hover:text-white hover:border-white/30'
+                      }`}
+                    >
+                      {themeName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Verified Badge Pose */}
+              <button 
+                onClick={() => setVerificationStep(isProfileVerified ? 'verified' : 'pose_prompt')}
+                className={`py-1.5 px-3 border rounded-lg text-[10px] font-bold font-mono flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  isProfileVerified 
+                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400 shadow-md shadow-emerald-500/10' 
+                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-zinc-350'
+                }`}
+              >
+                <CheckCircle2 className={`w-3.5 h-3.5 ${isProfileVerified ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                <span>{isProfileVerified ? 'VERIFIED HUMAN' : 'PROOF HUMAN POSE'}</span>
+              </button>
+
+            </div>
+
+          </Interactive3DCard>
+
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-[10px] font-mono select-none shadow-sm backdrop-blur-md">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-zinc-350 font-semibold">{onlineCount} users online roomed</span>
+          </div>
+
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------
+          3. SIGNED-IN HEADER BAR (ONLY FOR MATCH/ACTIVE PANELS)
+         ------------------------------------------------------------- */}
+      {isAgeVerified && !sysBanned && chatMode !== null && (
+        <header className="bg-[#0F0F0F] border-b border-[#1F1F1F] px-4 py-2.5 flex items-center justify-between sticky top-0 z-30 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-zinc-200 flex items-center justify-center rounded">
+              <MessageSquare className="w-3.5 h-3.5 text-zinc-950" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-sm tracking-tight text-zinc-150 font-mono">JustChat</span>
+                <span className="text-[8px] bg-zinc-805 border border-zinc-750 text-zinc-400 font-bold px-1.5 py-0.2 rounded uppercase font-mono">
+                  {chatMode} chat
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Core metrics details (Hiding Admin completely per request) */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-[#141414] border border-[#1F1F1F] rounded text-[10px] font-medium font-mono">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="text-zinc-300 font-bold">{onlineCount}</span>
+              <span className="text-zinc-550">users online</span>
+            </div>
+
+            {isProfileVerified && (
+              <span className="px-2 py-1 bg-emerald-955/25 border border-emerald-900/30 text-emerald-400 text-[9px] font-bold font-mono rounded">
+                VERIFIED HUMAN
+              </span>
+            )}
+          </div>
+        </header>
+      )}
+
+      {/* -------------------------------------------------------------
+          4. MAIN VIEW PORTS: ACTIVE CHATING / MATCHING SCREEN
+         ------------------------------------------------------------- */}
+      {isAgeVerified && !sysBanned && chatMode !== null && (
+        <main className="flex-1 w-full max-w-7xl mx-auto p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative min-h-[calc(100vh-140px)] animate-fade-in">
+          
+          {/* QUEUE MATCHING INTERACTIVE LOADING STATE */}
+          {status === 'matching' && (
+            <div className="lg:col-span-12 flex flex-col items-center justify-center gap-6 my-16 text-center animate-fade-in" id="queue_loading_viewport">
+              <div className="relative">
+                {/* Ping/Radar animation */}
+                <div className="absolute inset-x-0 -top-4 -bottom-4 bg-teal-500/10 blur-xl rounded-full scale-125 animate-pulse" />
+                <div className="relative flex items-center justify-center w-24 h-24 bg-zinc-950/80 border border-teal-500/25 rounded-full shadow-2xl">
+                  <RefreshCw className="w-10 h-10 text-teal-400 animate-spin" style={{ animationDuration: '3s' }} />
+                </div>
+              </div>
+
+              <div className="space-y-2 max-w-md">
+                <h3 className="text-lg font-bold font-mono tracking-tight text-teal-400 animate-pulse">Connecting to partner...</h3>
+                <p className="text-xs text-zinc-300 font-medium">Searching for available matching peers for {chatMode === 'video' ? 'Video Call' : 'Text Chat'}...</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Running secure tag overlap scanners</p>
+                
+                {interests.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 justify-center mt-3">
+                    {interests.map(i => (
+                      <span key={i} className="text-[9px] bg-black/40 border border-white/5 text-zinc-400 px-2 py-0.5 rounded-full font-mono font-medium">#{i}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 items-center">
+                <p className="text-[10px] text-zinc-450 font-mono">Instant mock matches will activate if queue is quiet.</p>
+                <button 
+                  onClick={handleCancelSearch}
+                  className="px-5 py-2.5 bg-red-955/20 hover:bg-red-955/40 border border-red-900/30 text-red-400 text-xs font-bold rounded-lg font-mono transition tracking-wider cursor-pointer shadow-lg hover:shadow-red-950/20"
+                >
+                  Cancel Matching Session &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVE LIVE CHAT VIEWPORT */}
+          {status === 'active' && (
+            <>
+              {/* IF VIDEO MODE: Left column video tracks split cards */}
+              {chatMode === 'video' && (
+                <section className="lg:col-span-7 flex flex-col gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-[280px]">
+                    
+                    {/* OWN CAMERA CONTAINER */}
+                    <Interactive3DCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col items-center justify-between shadow-2xl overflow-hidden min-h-[220px] rounded-xl">
+                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
+                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
+                          You
+                        </span>
+                        {isProfileVerified && (
+                          <span className="bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold font-mono px-1 py-0.5 rounded">
+                            VERIFIED
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="absolute top-2.5 right-2.5 z-10">
+                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-500 text-[8px] font-bold font-mono rounded uppercase">
+                          Theme: {selected3DTheme}
+                        </span>
+                      </div>
+
+                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5">
+                        <video 
+                          ref={localVideoRef} 
+                          autoPlay 
+                          playsInline 
+                          muted 
+                          className={`w-full h-full object-cover ${cameraActive ? 'scale-x-[-1]' : 'hidden'}`}
+                        />
+                        {(!cameraActive || !localStream) && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono">
+                            <VideoOff className="w-6 h-6 mb-1 text-zinc-600" />
+                            <span>Your camera feeds offline</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="w-full flex items-center justify-between mt-2.5 text-[9px] font-mono text-zinc-500">
+                        <span>Handshake cam: secure</span>
+                        
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={toggleMic}
+                            className={`p-1 rounded border transition cursor-pointer ${micActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
+                            title={micActive ? "Mute Microphone" : "Unmute Microphone"}
+                          >
+                            {micActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                          </button>
+                          <button 
+                            onClick={toggleCamera}
+                            className={`p-1 rounded border transition cursor-pointer ${cameraActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
+                            title={cameraActive ? "Mute Video" : "Unmute Video"}
+                          >
+                            {cameraActive ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </Interactive3DCard>
+
+                    {/* PEER REMOTE STREAM CONTAINER */}
+                    <Interactive3DCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col items-center justify-between shadow-2xl overflow-hidden min-h-[220px] rounded-xl">
+                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
+                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
+                          Partner
+                        </span>
+                        {partner?.verified && (
+                          <span className="inline-flex items-center gap-1 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded">
+                            VERIFIED HUMAN
+                          </span>
+                        )}
+                      </div>
+
+                      {partner && (
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          <div className="flex gap-1.5">
+                            {partner.interests.slice(0, 2).map((i, id) => (
+                              <span key={id} className="bg-black/60 border border-white/10 text-zinc-400 text-[8px] px-1.5 py-0.5 font-bold font-mono rounded">
+                                #{i}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5">
+                        {remoteStream ? (
+                          <video 
+                            ref={remoteVideoRef} 
+                            autoPlay 
+                            playsInline 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono text-center p-4">
+                            <span className="animate-pulse flex h-2 w-2 rounded-full bg-orange-400 mb-2" />
+                            <p className="font-semibold text-zinc-400">Negotiating WebRTC links...</p>
+                            <p className="text-[8px] text-zinc-550 leading-relaxed mt-1 font-sans">Wait for peer's audio & video stream signal matching.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="w-full flex items-center justify-between mt-2.5 text-[9px] font-mono text-zinc-500">
+                        <span>{partner ? `Connecting: ${partner.name}` : 'Establishing Handshake...'}</span>
+                        
+                        {partner && (
+                          <button 
+                            onClick={() => setIsReportOpen(true)}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-red-950/20 hover:bg-red-950/40 border border-red-900/35 rounded text-red-400 transition font-mono tracking-wide cursor-pointer text-[9px] font-bold"
+                          >
+                            <ShieldAlert className="w-3 h-3" />
+                            <span>Report violation</span>
+                          </button>
+                        )}
+                      </div>
+                    </Interactive3DCard>
+
+                  </div>
+
+                  {/* ACTIVE CONTROLS GRID */}
+                  <div className="bg-[#141414] border border-[#1F1F1F] p-3 rounded flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={handleEndMatch}
+                        className="px-4 py-2 bg-red-950/45 hover:bg-red-955/65 border border-red-900/40 text-red-400 font-bold rounded text-xs font-mono transition inline-flex items-center gap-1 animate-fade-in cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>End Session</span>
+                      </button>
+                      <button 
+                        onClick={handleSkipMatch}
+                        className="px-5 py-2 bg-zinc-200 hover:bg-white text-zinc-950 font-bold rounded text-xs font-mono transition inline-flex items-center gap-1 animate-fade-in cursor-pointer"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                        <span>Skip Partner</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-[#0A0A0A] p-1.5 rounded border border-[#1F1F1F]">
+                      <span className="text-zinc-500 font-semibold text-[9px] uppercase tracking-wider px-1 font-mono">Theme:</span>
+                      <div className="flex gap-1">
+                        {(['cosmic', 'neon', 'matrix', 'lounge'] as const).map((space) => (
+                          <button
+                            key={space}
+                            onClick={() => setSelected3DTheme(space)}
+                            className={`px-2 py-0.5 capitalize text-[10px] font-bold rounded transition cursor-pointer ${
+                              selected3DTheme === space 
+                              ? 'bg-zinc-800 text-zinc-100' 
+                              : 'text-zinc-500 hover:text-zinc-350'
+                            }`}
+                          >
+                            {space}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* CHATING MESSAGING BLOCK */}
+              <section className={`${chatMode === 'video' ? 'lg:col-span-5' : 'lg:col-span-12 max-w-2xl mx-auto w-full'} flex flex-col h-[520px] transition`}>
+                <div className="bg-[#141414] border border-[#1F1F1F] rounded flex-1 flex flex-col overflow-hidden shadow-sm">
+                  
+                  {/* Top Header of Chat Panel */}
+                  <div className="bg-[#0F0F0F] border-b border-[#1F1F1F] p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-[#1A1A1A] border border-[#27272a] flex items-center justify-center font-bold text-zinc-300 font-mono text-[9px]">
+                        {partner ? partner.name.slice(0,1).toUpperCase() : '?'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xs font-mono text-zinc-200">
+                          {partner ? partner.name : 'Matched Peer'}
+                        </h4>
+                        <p className="text-[8px] text-zinc-500 font-mono tracking-wider uppercase">
+                          Peer: Handshake Encrypted
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {partner?.interests.map(i => (
+                        <span key={i} className="text-[9px] bg-[#0A0A0A] border border-[#1F1F1F] text-zinc-400 px-1.5 py-0.2 rounded font-mono">
+                          #{i}
+                        </span>
+                      ))}
+                      {/* Unified Skip and End Controls */}
+                      <div className="flex items-center gap-1.5 ml-3 border-l border-[#1F1F1F] pl-3">
+                        <button 
+                          onClick={handleSkipMatch}
+                          className="px-2.5 py-1 bg-zinc-200 hover:bg-white text-zinc-950 font-bold text-[10px] font-mono rounded-md transition cursor-pointer flex items-center gap-1 shadow-md"
+                          title="Skip to next partner"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                          <span>Skip</span>
+                        </button>
+                        <button 
+                          onClick={handleEndMatch}
+                          className="px-2.5 py-1 bg-red-950/40 hover:bg-red-500 hover:text-white border border-red-500/20 text-red-400 font-bold text-[10px] font-mono rounded-md transition cursor-pointer flex items-center gap-1 shadow-md"
+                          title="End active session"
+                        >
+                          <X className="w-3 h-3" />
+                          <span>End</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Messages Stream Container */}
+                  <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[#0D0D0D]">
+                    {messages.length === 0 && (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-5 text-zinc-650 space-y-1.5">
+                        <MessageSquare className="w-7 h-7 text-zinc-800" />
+                        <div className="space-y-0.5 max-w-xs">
+                          <p className="font-bold text-[10px] font-mono text-zinc-500 uppercase">Handshake Channel active</p>
+                          <p className="text-[9px] text-zinc-650 leading-normal font-sans">
+                            Session text transmissions are anonymous, and strictly subject to local community trust controls. Say hello!
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {messages.map((m) => {
+                      if (m.sender === 'system') {
+                        return (
+                          <div key={m.id} className="flex justify-center">
+                            <span className="bg-[#0A0A0A] border border-[#1F1F1F] text-[8px] font-mono py-0.5 px-2.5 text-zinc-500 rounded uppercase">
+                              {m.text}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      const isSelf = m.sender === userId;
+                      return (
+                        <div key={m.id} className={`flex flex-col max-w-[85%] ${isSelf ? 'ml-auto items-end' : 'mr-auto items-start animate-fade-in'}`}>
+                          <div className="text-[8px] text-zinc-600 font-mono mb-0.5 px-0.5">
+                            {isSelf ? 'You' : (partner?.name || 'Partner')} • {new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <div className={`px-2.5 py-1.5 rounded text-xs leading-relaxed font-mono ${
+                            isSelf 
+                              ? 'bg-zinc-200 text-zinc-950 font-medium' 
+                              : 'bg-[#141414] border border-[#1F1F1F] text-zinc-200'
+                          }`}>
+                            {m.text}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div ref={chatBottomRef} />
+                  </div>
+
+                  {/* Submit message input form */}
+                  <form onSubmit={sendMessage} className="bg-[#0F0F0F] border-t border-[#1F1F1F] p-2 flex gap-1.5">
+                    <input 
+                      type="text" 
+                      placeholder="Enter transmission message..."
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      className="flex-1 px-3 py-1.5 bg-[#0a0a0a] border border-[#1F1F1F] rounded focus:outline-none focus:border-zinc-500 text-xs font-mono text-zinc-250 placeholder-zinc-700"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={!messageInput.trim()}
+                      className="px-3 bg-zinc-200 text-[#0f0f0f] font-bold rounded hover:bg-white disabled:opacity-25 transition text-xs font-mono flex items-center justify-center cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
+
+                </div>
+              </section>
+            </>
+          )}
+
+        </main>
+      )}
+
+      {/* -------------------------------------------------------------
+          5. MODAL DIALOGS AND SLIDEOUT PANELS
+         ------------------------------------------------------------- */}
+      
+      {/* 5A. PROOF HUMAN GESTURE VERIF PROTOCOL */}
+      {verificationStep !== 'idle' && verificationStep !== 'verified' && (
+        <div className="fixed inset-0 bg-[#0A0A0A]/85 backdrop-blur-sm flex items-center justify-center p-4 z-40">
+          <div className="w-full max-w-sm bg-[#141414] border border-[#1F1F1F] rounded p-5 relative">
+            <button 
+              onClick={() => setVerificationStep('idle')}
+              className="absolute top-3 right-3 text-zinc-500 hover:text-white cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="text-center mb-4 space-y-1">
+              <span className="px-2 py-0.5 bg-zinc-800 text-zinc-300 border border-zinc-700 text-[8px] font-bold tracking-widest uppercase rounded inline-block font-mono">
+                Mandatory Pose Guard
+              </span>
+              <h2 className="text-sm font-bold font-mono text-zinc-100">Prove Human Presence</h2>
+              <p className="text-[10px] text-zinc-400">Perform this random hand gesture clearly in front of your camera.</p>
+            </div>
+
+            {verificationStep === 'pose_prompt' && (
+              <div className="space-y-3 font-sans">
+                <div className="p-4 bg-[#0A0A0A] border border-[#1F1F1F] rounded text-center space-y-2">
+                  <p className="text-[8px] text-zinc-500 uppercase tracking-widest font-mono">Perform Gesture:</p>
+                  <p className="text-2xl font-bold font-mono text-emerald-400">{selectedGesture}</p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setVerificationStep('idle')}
+                    className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-850 text-[10px] font-bold rounded text-zinc-400 transition font-mono border border-[#1F1F1F] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitVerificationPose}
+                    className="flex-1 py-1.5 bg-zinc-100 hover:bg-white text-zinc-950 text-[10px] font-bold rounded transition font-mono cursor-pointer"
+                  >
+                    Submit Pose Verification
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {verificationStep === 'scanning' && (
+              <div className="p-4 text-center space-y-3">
+                <RefreshCw className="w-6 h-6 text-emerald-450 animate-spin mx-auto" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-xs font-mono text-zinc-200">Analyzing Face & Hand Gesture Pose...</p>
+                  <p className="text-[8px] text-zinc-500 font-mono uppercase tracking-wider">Neural pose checking</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 5B. SECURITY SENTINEL REPORT SYSTEM */}
+      {isReportOpen && partner && (
+        <div className="fixed inset-0 bg-[#0A0A0A]/85 backdrop-blur-sm flex items-center justify-center p-4 z-40">
+          <div className="w-full max-w-md bg-[#141414] border border-[#1F1F1F] rounded p-5 relative">
+            
+            <button 
+              onClick={() => setIsReportOpen(false)}
+              className="absolute top-3 right-3 text-zinc-500 hover:text-white cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="text-center mb-4 space-y-1">
+              <span className="px-2 py-0.5 bg-red-950/25 border border-red-900/30 text-red-400 text-[8px] font-bold tracking-widest uppercase rounded inline-block font-mono">
+                Sentinel moderations
+              </span>
+              <h2 className="text-sm font-bold font-mono text-zinc-100">Send Trust violation</h2>
+              <p className="text-[10px] text-zinc-450">Please report harassment or inappropriate actions.</p>
+            </div>
+
+            {showReportSuccess ? (
+              <div className="p-3 text-center space-y-2 animate-fade-in">
+                <CheckCircle2 className="w-8 h-8 text-emerald-450 mx-auto" />
+                <h4 className="text-xs font-bold text-emerald-400 font-mono">Report Filed Securely</h4>
+                <p className="text-[10px] text-zinc-400 font-sans">Checking session conversation logs manually. Resetting peer room...</p>
+              </div>
+            ) : (
+              <div className="space-y-4 font-sans">
+                <div className="bg-[#0A0A0A] p-2.5 rounded border border-[#1F1F1F] space-y-0.5">
+                  <span className="text-[8px] text-zinc-520 uppercase font-mono block">Suspect Session key:</span>
+                  <span className="text-[10px] text-zinc-350 font-mono block break-all font-semibold select-all">{partner.id}</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-450 font-mono uppercase block">Violation Reason</label>
+                  <select 
+                    value={reportReason} 
+                    onChange={(e) => setReportReason(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-[#0A0A0A] border border-[#1F1F1F] rounded focus:outline-none focus:border-zinc-500 text-xs font-mono text-zinc-300"
+                  >
+                    <option value="Inappropriate stream">Inappropriate stream feed or action</option>
+                    <option value="Harassment">Harassment or abusive speech</option>
+                    <option value="Bot/Spam">Synthetic Bot / advertising links</option>
+                    <option value="Minor profile">Suspected under-aged account</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-455 font-mono uppercase block">Extra description</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Provide specific dialogue statements or action descriptions..."
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-[#0A0A0A] border border-[#1F1F1F] rounded focus:outline-none focus:border-zinc-500 text-xs font-mono text-zinc-300 resize-none font-sans"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setIsReportOpen(false)}
+                    className="flex-1 py-1.5 bg-zinc-900 text-[10px] font-bold rounded text-zinc-400 border border-[#1F1F1F] transition font-mono cursor-pointer"
+                  >
+                    Close
+                  </button>
+                  <button 
+                    onClick={handleReportSubmit}
+                    className="flex-1 py-1.5 bg-red-950/40 hover:bg-red-950/60 border border-red-900/40 text-red-400 text-[10px] font-bold rounded transition font-mono cursor-pointer"
+                  >
+                    Submit Report &rArr;
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* FOOTER PROTOCOL INFO */}
+      <footer className="bg-[#0F0F0F] border-t border-[#1F1F1F] px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-zinc-400 font-mono">
+        <div className="flex flex-wrap items-center gap-4">
+          <span>SECURE ENCRYPTED HANDSHAKE ACTIVE</span>
+          <span>STATE: PROTOCOLS BOUNDED</span>
+          <button onClick={() => setShowAboutModal(true)} className="text-teal-400 hover:text-teal-300 underline cursor-pointer">About Us</button>
+          <button onClick={() => setShowTermsModal(true)} className="text-teal-400 hover:text-teal-300 underline cursor-pointer">Terms & Conditions</button>
+        </div>
+        <div>
+          <span>&copy; {new Date().getFullYear()} JustChat Space • Preserving Authentic Connection.</span>
+        </div>
+      </footer>
+
+      {/* -------------------------------------------------------------
+          ABOUT US MODAL OVERLAY
+         ------------------------------------------------------------- */}
+      {showAboutModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" id="about_us_modal">
+          <Interactive3DCard className="w-full max-w-lg p-6 relative bg-zinc-950/95 border border-zinc-800 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-400 via-emerald-500 to-indigo-500" />
+            
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+              <h3 className="text-base font-bold font-mono text-zinc-100 tracking-tight flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shadow shadow-teal-500/50 animate-pulse" />
+                About JustChat
+              </h3>
+              <button 
+                onClick={() => setShowAboutModal(false)}
+                className="text-zinc-500 hover:text-white transition text-xs font-mono px-2 py-1 bg-white/5 rounded"
+              >
+                Close ESC
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-zinc-300 leading-relaxed font-sans">
+              <p>
+                <strong>JustChat</strong> is a next-generation real-time peering lounge built to safely match passionate coders, musicians, artists, and creators globally. 
+              </p>
+              
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5 font-mono text-[11px]">
+                <h4 className="font-bold text-teal-400 uppercase">Core Architecture details</h4>
+                <ul className="list-disc pl-4 space-y-1 text-zinc-400">
+                  <li><strong>Instant Match Engine:</strong> Algorithmic pairing based on tag intersects.</li>
+                  <li><strong>Simulated Fallbacks:</strong> Integrated interactive chat AI agents when volume is low.</li>
+                  <li><strong>Custom Holographic Vibe Scenes:</strong> 3D canvas rendering supporting Cosmic, Neon, Lounge, and Matrix environments.</li>
+                  <li><strong>P2P Media Protocols:</strong> Encrypted WebRTC streams.</li>
+                </ul>
+              </div>
+
+              <p>
+                Our mission is to help restore genuine, instant, friction-free social micro-conversations without the bloat, ads, trackers, or endless algorithms of typical platforms.
+              </p>
+
+              <div className="border-t border-white/5 pt-3 flex justify-end font-mono">
+                <button 
+                  onClick={() => setShowAboutModal(false)}
+                  className="px-4 py-2 bg-zinc-900 border border-white/10 text-zinc-300 rounded-lg hover:bg-zinc-800 transition text-[11px] font-bold cursor-pointer"
+                >
+                  Close Panel
+                </button>
+              </div>
+            </div>
+          </Interactive3DCard>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------
+          TERMS & CONDITIONS MODAL OVERLAY
+         ------------------------------------------------------------- */}
+      {showTermsModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" id="terms_conditions_modal">
+          <Interactive3DCard className="w-full max-w-lg p-6 relative bg-zinc-950/95 border border-zinc-800 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-400 via-orange-500 to-indigo-500" />
+            
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+              <h3 className="text-base font-bold font-mono text-zinc-100 tracking-tight flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow shadow-red-500/50 animate-pulse" />
+                Terms & Conditions
+              </h3>
+              <button 
+                onClick={() => setShowTermsModal(false)}
+                className="text-zinc-500 hover:text-white transition text-xs font-mono px-2 py-1 bg-white/5 rounded"
+              >
+                Close ESC
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-zinc-300 leading-relaxed font-sans">
+              <p className="font-semibold text-zinc-200">
+                Welcome to JustChat. By using this platform, you commit to respecting the community standard rules, terms, and guidelines:
+              </p>
+
+              <ol className="list-decimal pl-4 space-y-3 text-zinc-400 font-mono text-[11px]">
+                <li>
+                  <strong className="text-zinc-205">Age Check requirements:</strong>
+                  <br />You must be at least 18 years of age. Underaged users are strictly prohibited and will be reported to moderation authorities.
+                </li>
+                <li>
+                  <strong className="text-zinc-205">Respectful peer interaction:</strong>
+                  <br />Harassment, bullying, toxic speeches, vulgar displays, or non-consensual multimedia broadcasts are forbidden.
+                </li>
+                <li>
+                  <strong className="text-zinc-205">Service Suspension:</strong>
+                  <br />Our system automatically flags high-frequency skips or reports. Valid violation reports trigger immediate hardware IP bans.
+                </li>
+                <li>
+                  <strong className="text-zinc-205">P2P Security responsibility:</strong>
+                  <br />Stream data is encrypted and negotiated peer-to-peer. JustChat does not cache transmission streams or logs. You are solely responsible for interactions you initiate.
+                </li>
+              </ol>
+
+              <div className="p-3 bg-red-950/20 border border-red-900/40 rounded-xl leading-relaxed text-red-300 text-[10px] font-mono">
+                SAFETY PROTOCOL: Violating the terms will terminate your session and black-list your session signatures from joining again.
+              </div>
+
+              <div className="border-t border-white/5 pt-3 flex gap-2 justify-end font-mono">
+                <button 
+                  onClick={() => {
+                    setHasAgreedTerms(true);
+                    setShowTermsModal(false);
+                  }}
+                  className="px-4 py-2 bg-teal-500 text-black rounded-lg hover:bg-teal-400 transition text-[11px] font-bold cursor-pointer font-sans"
+                >
+                  I Agree & Accept Checklist
+                </button>
+                <button 
+                  onClick={() => setShowTermsModal(false)}
+                  className="px-4 py-2 bg-zinc-900 border border-white/10 text-zinc-300 rounded-lg hover:bg-zinc-800 transition text-[11px] font-bold cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </Interactive3DCard>
+        </div>
+      )}
+
+    </div>
+  );
+}
