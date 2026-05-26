@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { handleFirebaseAPI } from './firebaseBackend';
 import { 
   MessageSquare, Shield, ShieldAlert, Video, VideoOff, Mic, MicOff, 
   Send, CheckCircle2, Users, Ban, X, Check, Award, AlertOctagon,
@@ -38,8 +37,9 @@ if (typeof window !== 'undefined') {
 // Safe API fetch helper to support static host deployments (like GitHub Pages proxying requests to an external self-hosted backend)
 const appFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const apiUrl = (import.meta as any).env.VITE_API_URL;
-  if (typeof input === 'string' && input.startsWith('/api')) {
-    return handleFirebaseAPI(input, init);
+  if (apiUrl && typeof input === 'string' && input.startsWith('/api')) {
+    const base = apiUrl.replace(/\/$/, '');
+    return window.fetch(base + input, init);
   }
   return window.fetch(input, init);
 };
