@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { handleFirebaseAPI } from './firebaseBackend';
 import { 
   MessageSquare, Shield, ShieldAlert, Video, VideoOff, Mic, MicOff, 
   Send, CheckCircle2, Users, Ban, X, Check, Award, AlertOctagon,
@@ -35,11 +36,10 @@ if (typeof window !== 'undefined') {
 }
 
 // Safe API fetch helper to support static host deployments (like GitHub Pages proxying requests to an external self-hosted backend)
-const appFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+const appFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const apiUrl = (import.meta as any).env.VITE_API_URL;
-  if (apiUrl && typeof input === 'string' && input.startsWith('/api')) {
-    const base = apiUrl.replace(/\/$/, '');
-    return window.fetch(base + input, init);
+  if (typeof input === 'string' && input.startsWith('/api')) {
+    return handleFirebaseAPI(input, init);
   }
   return window.fetch(input, init);
 };
@@ -399,7 +399,7 @@ function Interactive3DCard({ children, className = '', id }: { children: React.R
 // -------------------------------------------------------------
 export default function App() {
   // Session IDs and Identity (uses sessionStorage per tab session for multi-tab testing)
-  const [userId] = useState(() => {
+  const [userId, setUserId] = useState(() => {
     const saved = sessionStorage.getItem('justchat_user_id');
     if (saved) return saved;
     const fresh = 'u_' + Math.random().toString(36).substr(2, 9);
@@ -1071,6 +1071,11 @@ export default function App() {
       });
 
       if (res.ok) {
+        const resData = await res.json();
+        if (resData.user?.id) {
+           setUserId(resData.user.id);
+           sessionStorage.setItem('justchat_user_id', resData.user.id);
+        }
         localStorage.setItem('justchat_age_verified', 'true');
         setIsAgeVerified(true);
         setShowAgeGate(false);
