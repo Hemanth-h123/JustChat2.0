@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { createServer as createHttpServer } from 'http';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -91,6 +92,7 @@ async function startServer() {
   const app = express();
   const httpServer = createHttpServer(app);
 
+  app.use(cors());
   app.use(express.json());
 
   // Log requests & Ban enforcement
@@ -637,7 +639,7 @@ async function startServer() {
     console.log('[Server] Set up to serve static assets from "/dist".');
   }
 
-  const port = 3000;
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   httpServer.listen(port, '0.0.0.0', () => {
     console.log(`[Server] Server is online and listening at http://0.0.0.0:${port}`);
   });

@@ -346,50 +346,13 @@ function Background3D({ theme }: { theme: 'cosmic' | 'neon' | 'matrix' | 'lounge
 // -------------------------------------------------------------
 // INTERACTIVE GLASSMORPHIC 3D TILT CARD COMPONENT
 // -------------------------------------------------------------
-function Interactive3DCard({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const card = cardRef.current;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Calculate tilt angles based on cursor position relative to card center
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = -(y - centerY) / (rect.height / 15); // subtle max angle
-    const rotateY = (x - centerX) / (rect.width / 15);
-    
-    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
-    card.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-    card.style.boxShadow = `0 35px 65px rgba(0, 0, 0, 0.6), 0 0 30px rgba(16, 185, 129, 0.15)`;
-  };
-
-  const handleMouseLeave = () => {
-    if (!cardRef.current) return;
-    const card = cardRef.current;
-    card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-    card.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-    card.style.boxShadow = 'none';
-  };
-
+function ActionCard({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
   return (
     <div
-      ref={cardRef}
       id={id}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className={`transition-all duration-300 ease-out border border-white/8 rounded-2xl bg-zinc-950/75 backdrop-blur-xl ${className}`}
-      style={{
-        transformStyle: 'preserve-3d',
-        transition: 'transform 0.2s ease-out, border-color 0.3s, box-shadow 0.3s',
-      }}
+      className={`border border-white/10 rounded-2xl bg-zinc-950/80 backdrop-blur-xl shadow-2xl ${className}`}
     >
-      <div style={{ transform: 'translateZ(18px)' }} className="w-full h-full">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
@@ -648,13 +611,18 @@ export default function App() {
   // Bind local/remote stream dynamically on mount
   useEffect(() => {
     if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
     }
   }, [localStream, status, chatMode]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+      if (remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+      remoteVideoRef.current.play().catch(e => console.warn("Autoplay blocked for remote stream:", e));
     }
   }, [remoteStream, status, chatMode]);
 
@@ -779,7 +747,13 @@ export default function App() {
     try {
       console.log(`[WebRTC] Set up signaling peer as ${role}`);
       const configuration: RTCConfiguration = {
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun.l.google.com:5349' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+        ]
       };
       
       const pc = new RTCPeerConnection(configuration);
@@ -831,7 +805,7 @@ export default function App() {
   const pollIceAndSdp = (role: 'host' | 'guest') => {
     const signalInterval = setInterval(async () => {
       const pc = peerConnectionRef.current;
-      if (!pc || status !== 'active') {
+      if (!pc) {
         clearInterval(signalInterval);
         return;
       }
@@ -891,8 +865,12 @@ export default function App() {
       });
       const data = await res.json();
       if (data.messages) {
-        setMessages(data.messages);
-        scrollToBottom();
+        setMessages(prev => {
+          if (prev.length !== data.messages.length) {
+            scrollToBottom();
+          }
+          return data.messages;
+        });
       }
     } catch (err) {
       console.warn("Message sync fail:", err);
@@ -1137,7 +1115,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col justify-between text-zinc-100 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#09091b] via-[#020206] to-[#000000] font-sans antialiased overflow-x-hidden select-none">
+    <div className="relative min-h-[100dvh] flex flex-col justify-between text-zinc-100 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#09091b] via-[#020206] to-[#000000] font-sans antialiased overflow-x-hidden select-none">
       
       {/* Three.js 3D Background */}
       <Background3D theme={selected3DTheme} />
@@ -1145,7 +1123,7 @@ export default function App() {
       {/* Access suspension lock screen */}
       {sysBanned && (
         <div className="fixed inset-0 bg-[#020206]/95 flex flex-col items-center justify-center p-4 z-50 text-center">
-          <Interactive3DCard className="max-w-md bg-zinc-950/80 border border-red-500/20 p-6 rounded-2xl shadow-2xl">
+          <ActionCard className="max-w-md bg-zinc-950/80 border border-red-500/20 p-6 rounded-2xl shadow-2xl">
             <AlertOctagon className="w-12 h-12 text-red-500 mx-auto mb-3 animate-pulse" />
             <h1 className="text-lg font-mono font-bold text-red-400 uppercase tracking-widest mb-2">Access Suspended</h1>
             <p className="text-zinc-405 text-xs mb-4 leading-relaxed">
@@ -1154,7 +1132,7 @@ export default function App() {
             <div className="text-[9px] text-zinc-400 bg-black/60 p-2.5 rounded border border-white/10 font-mono">
               SESSION PIN: {userId}
             </div>
-          </Interactive3DCard>
+          </ActionCard>
         </div>
       )}
 
@@ -1163,7 +1141,7 @@ export default function App() {
          ------------------------------------------------------------- */}
       {showAgeGate && !sysBanned && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-40 animate-fade-in">
-          <Interactive3DCard className="w-full max-w-md p-6 relative bg-zinc-950/80 border border-white/10 shadow-2xl rounded-2xl">
+          <ActionCard className="w-full max-w-md p-6 relative bg-zinc-950/80 border border-white/10 shadow-2xl rounded-2xl">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-400 via-indigo-500 to-pink-500" />
             
             <div className="text-center mb-5">
@@ -1247,7 +1225,7 @@ export default function App() {
               <span>HOST: SECURE PORT 3000</span>
               <span>STANDARDS COMPLIANT</span>
             </div>
-          </Interactive3DCard>
+          </ActionCard>
         </div>
       )}
 
@@ -1256,7 +1234,7 @@ export default function App() {
           Accessible without initial locking; verified status checked before matching
          ------------------------------------------------------------- */}
       {!sysBanned && chatMode === null && (
-        <div className="flex-1 w-full max-w-4xl mx-auto px-4 py-8 flex flex-col justify-center items-center gap-8 min-h-[calc(100vh-120px)] animate-fade-in" id="homepage_container">
+        <div className="flex-1 w-full max-w-4xl mx-auto px-4 py-8 flex flex-col justify-center items-center gap-8 min-h-0 animate-fade-in" id="homepage_container">
           
           <div className="text-center space-y-2 max-w-lg">
             <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-teal-400 font-bold text-[9px] rounded-full uppercase tracking-widest font-mono shadow-sm shadow-teal-500/10">
@@ -1269,7 +1247,7 @@ export default function App() {
           </div>
 
           {/* Central Homepage Control Dashboard */}
-          <Interactive3DCard className="w-full max-w-2xl p-5 sm:p-6 shadow-2xl space-y-6 bg-zinc-950/80 border border-white/8 backdrop-blur-xl relative overflow-hidden rounded-2xl">
+          <ActionCard className="w-full max-w-2xl p-5 sm:p-6 shadow-2xl space-y-6 bg-zinc-950/80 border border-white/8 backdrop-blur-xl relative overflow-hidden rounded-2xl">
             <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
             
             {/* Alias / Nickname Section */}
@@ -1426,7 +1404,7 @@ export default function App() {
 
             </div>
 
-          </Interactive3DCard>
+          </ActionCard>
 
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-[10px] font-mono select-none shadow-sm backdrop-blur-md">
             <span className="relative flex h-2 w-2">
@@ -1479,11 +1457,11 @@ export default function App() {
           4. MAIN VIEW PORTS: ACTIVE CHATING / MATCHING SCREEN
          ------------------------------------------------------------- */}
       {isAgeVerified && !sysBanned && chatMode !== null && (
-        <main className="flex-1 w-full max-w-7xl mx-auto p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative min-h-[calc(100vh-140px)] animate-fade-in">
+        <main className="flex-1 w-full max-w-7xl mx-auto p-3 flex flex-col lg:grid lg:grid-cols-12 gap-3 relative animate-fade-in min-h-0">
           
           {/* QUEUE MATCHING INTERACTIVE LOADING STATE */}
           {status === 'matching' && (
-            <div className="lg:col-span-12 flex flex-col items-center justify-center gap-6 my-16 text-center animate-fade-in" id="queue_loading_viewport">
+            <div className="lg:col-span-12 flex flex-col items-center justify-center gap-6 flex-1 text-center animate-fade-in" id="queue_loading_viewport">
               <div className="relative">
                 {/* Ping/Radar animation */}
                 <div className="absolute inset-x-0 -top-4 -bottom-4 bg-teal-500/10 blur-xl rounded-full scale-125 animate-pulse" />
@@ -1523,11 +1501,11 @@ export default function App() {
             <>
               {/* IF VIDEO MODE: Left column video tracks split cards */}
               {chatMode === 'video' && (
-                <section className="lg:col-span-7 flex flex-col gap-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-[280px]">
+                <section className="col-span-full lg:col-span-7 flex flex-col gap-3 h-auto max-h-[40vh] lg:max-h-none shrink-0">
+                  <div className="flex gap-2 overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-visible">
                     
                     {/* OWN CAMERA CONTAINER */}
-                    <Interactive3DCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col items-center justify-between shadow-2xl overflow-hidden min-h-[220px] rounded-xl">
+                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:min-h-[220px] rounded-xl shrink-0">
                       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           You
@@ -1545,26 +1523,26 @@ export default function App() {
                         </span>
                       </div>
 
-                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5">
+                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5">
                         <video 
                           ref={localVideoRef} 
                           autoPlay 
                           playsInline 
                           muted 
-                          className={`w-full h-full object-cover ${cameraActive ? 'scale-x-[-1]' : 'hidden'}`}
+                          className={`w-full h-full object-contain sm:object-cover ${cameraActive ? 'scale-x-[-1]' : 'hidden'}`}
                         />
                         {(!cameraActive || !localStream) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono">
                             <VideoOff className="w-6 h-6 mb-1 text-zinc-600" />
-                            <span>Your camera feeds offline</span>
+                            <span>Cam offline</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="w-full flex items-center justify-between mt-2.5 text-[9px] font-mono text-zinc-500">
-                        <span>Handshake cam: secure</span>
+                      <div className="w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500">
+                        <span className="truncate">Handshake cam: secure</span>
                         
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 shrink-0 ml-1">
                           <button 
                             onClick={toggleMic}
                             className={`p-1 rounded border transition cursor-pointer ${micActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
@@ -1581,10 +1559,10 @@ export default function App() {
                           </button>
                         </div>
                       </div>
-                    </Interactive3DCard>
+                    </ActionCard>
 
                     {/* PEER REMOTE STREAM CONTAINER */}
-                    <Interactive3DCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col items-center justify-between shadow-2xl overflow-hidden min-h-[220px] rounded-xl">
+                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:min-h-[220px] rounded-xl shrink-0">
                       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           Partner
@@ -1608,37 +1586,38 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5">
+                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5">
                         {remoteStream ? (
                           <video 
                             ref={remoteVideoRef} 
                             autoPlay 
                             playsInline 
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain sm:object-cover"
                           />
                         ) : (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono text-center p-4">
-                            <span className="animate-pulse flex h-2 w-2 rounded-full bg-orange-400 mb-2" />
-                            <p className="font-semibold text-zinc-400">Negotiating WebRTC links...</p>
-                            <p className="text-[8px] text-zinc-550 leading-relaxed mt-1 font-sans">Wait for peer's audio & video stream signal matching.</p>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono text-center p-2">
+                            <span className="animate-pulse flex h-2 w-2 rounded-full bg-orange-400 mb-1" />
+                            <p className="font-semibold text-zinc-400">Negotiating...</p>
+                            <p className="text-[8px] text-zinc-550 leading-relaxed mt-1 font-sans hidden sm:block">Wait for peer's audio & video stream signal matching.</p>
                           </div>
                         )}
                       </div>
 
-                      <div className="w-full flex items-center justify-between mt-2.5 text-[9px] font-mono text-zinc-500">
-                        <span>{partner ? `Connecting: ${partner.name}` : 'Establishing Handshake...'}</span>
+                      <div className="w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500">
+                        <span className="truncate">{partner ? `Connecting: ${partner.name}` : 'Handshake...'}</span>
                         
                         {partner && (
                           <button 
                             onClick={() => setIsReportOpen(true)}
-                            className="flex items-center gap-1 px-2 py-0.5 bg-red-950/20 hover:bg-red-950/40 border border-red-900/35 rounded text-red-400 transition font-mono tracking-wide cursor-pointer text-[9px] font-bold"
+                            className="flex items-center gap-1 px-2 py-0.5 bg-red-950/20 hover:bg-red-950/40 border border-red-900/35 rounded text-red-400 transition font-mono tracking-wide cursor-pointer text-[9px] font-bold shrink-0 ml-1"
                           >
                             <ShieldAlert className="w-3 h-3" />
-                            <span>Report violation</span>
+                            <span className="hidden sm:inline">Report violation</span>
+                            <span className="sm:hidden">Report</span>
                           </button>
                         )}
                       </div>
-                    </Interactive3DCard>
+                    </ActionCard>
 
                   </div>
 
@@ -1684,8 +1663,8 @@ export default function App() {
               )}
 
               {/* CHATING MESSAGING BLOCK */}
-              <section className={`${chatMode === 'video' ? 'lg:col-span-5' : 'lg:col-span-12 max-w-2xl mx-auto w-full'} flex flex-col h-[520px] transition`}>
-                <div className="bg-[#141414] border border-[#1F1F1F] rounded flex-1 flex flex-col overflow-hidden shadow-sm">
+              <section className={`${chatMode === 'video' ? 'col-span-full lg:col-span-5' : 'col-span-full lg:col-span-12 max-w-2xl mx-auto w-full'} flex-1 flex flex-col min-h-0 transition`}>
+                <div className="bg-[#141414] border border-[#1F1F1F] rounded flex-1 flex flex-col overflow-hidden shadow-sm h-full">
                   
                   {/* Top Header of Chat Panel */}
                   <div className="bg-[#0F0F0F] border-b border-[#1F1F1F] p-3 flex items-center justify-between">
@@ -1958,7 +1937,7 @@ export default function App() {
          ------------------------------------------------------------- */}
       {showAboutModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" id="about_us_modal">
-          <Interactive3DCard className="w-full max-w-lg p-6 relative bg-zinc-950/95 border border-zinc-800 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <ActionCard className="w-full max-w-lg p-6 relative bg-zinc-950/95 border border-zinc-800 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-400 via-emerald-500 to-indigo-500" />
             
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
@@ -2002,7 +1981,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-          </Interactive3DCard>
+          </ActionCard>
         </div>
       )}
 
@@ -2011,7 +1990,7 @@ export default function App() {
          ------------------------------------------------------------- */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" id="terms_conditions_modal">
-          <Interactive3DCard className="w-full max-w-lg p-6 relative bg-zinc-950/95 border border-zinc-800 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <ActionCard className="w-full max-w-lg p-6 relative bg-zinc-950/95 border border-zinc-800 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-red-400 via-orange-500 to-indigo-500" />
             
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
@@ -2073,7 +2052,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-          </Interactive3DCard>
+          </ActionCard>
         </div>
       )}
 
