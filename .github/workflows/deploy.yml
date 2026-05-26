@@ -38,7 +38,9 @@ jobs:
         run: npm install
 
       - name: Build Application
-        run: npm run build
+        run: |
+          npm run build
+          touch ./dist/.nojekyll
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
