@@ -615,6 +615,21 @@ export default function App() {
         localVideoRef.current.srcObject = localStream;
       }
     }
+    
+    // Also inject tracks to PeerConnection if they were missed during fast matches
+    if (localStream && peerConnectionRef.current) {
+      const pc = peerConnectionRef.current;
+      const senders = pc.getSenders();
+      localStream.getTracks().forEach(track => {
+        const alreadyAdded = senders.find(s => s.track === track);
+        if (!alreadyAdded) {
+          pc.addTrack(track, localStream);
+          // If we add a track late, we must negotiate again! But simple addition is often enough if SDP is already renegotiating,
+          // though typically renegotiation is required. We can just add them and let the ICE state handle it, or we simply rely on the fact 
+          // that setupWebRTCPeerConnection will add them reliably if we just wait properly.
+        }
+      });
+    }
   }, [localStream, status, chatMode]);
 
   useEffect(() => {
@@ -664,6 +679,17 @@ export default function App() {
         setOnlineCount(data.onlineCount || 1);
 
         if (response.ok) {
+          if (data.status === 'offline') {
+            // Server forgot us (e.g. restart), re-register silently
+            const resolvedName = userName.trim() || 'Anonymous Human';
+            await appFetch('/api/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: resolvedName, id: userId, interests })
+            });
+            return;
+          }
+
           if (data.status === 'active' && data.room) {
             setRoomId(data.room.id);
             setPartner(data.partner);
@@ -749,10 +775,9 @@ export default function App() {
       const configuration: RTCConfiguration = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun.l.google.com:5349' },
-          { urls: 'stun:stun3.l.google.com:19302' },
         ]
       };
       
@@ -766,12 +791,23 @@ export default function App() {
       }
 
       pc.ontrack = (event) => {
+        console.log("[WebRTC] Got Remote stream track:", event.track.kind);
         if (event.streams && event.streams[0]) {
-          console.log("[WebRTC] Got Remote stream tracks.");
           setRemoteStream(event.streams[0]);
-          if (remoteVideoRef.current) {
+          if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== event.streams[0]) {
             remoteVideoRef.current.srcObject = event.streams[0];
           }
+        } else {
+          setRemoteStream(prev => {
+            const stream = prev || new MediaStream();
+            if (!stream.getTracks().includes(event.track)) {
+              stream.addTrack(event.track);
+            }
+            if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== stream) {
+              remoteVideoRef.current.srcObject = stream;
+            }
+            return stream;
+          });
         }
       };
 
@@ -782,6 +818,30 @@ export default function App() {
             headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
             body: JSON.stringify({ ice: event.candidate, role })
           });
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log("[WebRTC] ICE Connection State:", pc.iceConnectionState);
+        if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+          // You might try to restart ICE here, but for now we log it.
+          console.warn("[WebRTC] WebRTC connection failed or disconnected.");
+        }
+      };
+
+      pc.onnegotiationneeded = async () => {
+        try {
+          if (role === 'host') {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await appFetch('/api/signal/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+              body: JSON.stringify({ sdp: offer, role })
+            });
+          }
+        } catch (e) {
+          console.error("Negotiation failed", e);
         }
       };
 
