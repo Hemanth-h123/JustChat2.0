@@ -424,6 +424,7 @@ export default function App() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const isTransitioningRef = useRef(false);
 
   // Save nickname updates to local storage
   const handleNicknameChange = (newVal: string) => {
@@ -666,6 +667,7 @@ export default function App() {
     if (!isAgeVerified) return;
 
     const interval = setInterval(async () => {
+      if (isTransitioningRef.current) return;
       try {
         const response = await appFetch('/api/status', {
           headers: { 'x-user-id': userId }
@@ -865,6 +867,9 @@ export default function App() {
   };
 
   const pollIceAndSdp = (role: 'host' | 'guest') => {
+    if ((window as any)._signalIntervalId) {
+      clearInterval((window as any)._signalIntervalId);
+    }
     const signalInterval = setInterval(async () => {
       const pc = peerConnectionRef.current;
       if (!pc) {
@@ -906,8 +911,22 @@ export default function App() {
         console.warn("Signaling poll failed:", err);
       }
     }, 1500);
+    (window as any)._signalIntervalId = signalInterval;
   };
 
+  // Re-attach media streams to video elements when they remount
+  useEffect(() => {
+    if (status === 'active' && chatMode === 'video') {
+      if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
+      if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+    }
+  }, [status, chatMode, localStream, remoteStream]);
+
+  // Clean WebRTC and intervals
   const cleanupWebRTC = () => {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
@@ -916,6 +935,10 @@ export default function App() {
     if ((window as any)._remoteSimIntervalId) {
       clearInterval((window as any)._remoteSimIntervalId);
       (window as any)._remoteSimIntervalId = null;
+    }
+    if ((window as any)._signalIntervalId) {
+      clearInterval((window as any)._signalIntervalId);
+      (window as any)._signalIntervalId = null;
     }
     setRemoteStream(null);
   };
@@ -947,7 +970,9 @@ export default function App() {
       setShowAgeGate(true);
       return;
     }
+    if (isTransitioningRef.current) return;
     try {
+      isTransitioningRef.current = true;
       setChatMode(mode);
       setStatus('matching');
       setMessages([]);
@@ -969,12 +994,16 @@ export default function App() {
       console.error("Match init failure:", err);
       setStatus('idle');
       setChatMode(null);
+    } finally {
+      isTransitioningRef.current = false;
     }
   };
 
   // Skip partner: both find a new partner
   const handleSkipMatch = async () => {
+    if (isTransitioningRef.current) return;
     try {
+      isTransitioningRef.current = true;
       setStatus('matching');
       setPartner(null);
       setRoomId(null);
@@ -997,12 +1026,16 @@ export default function App() {
 
     } catch (err) {
       console.warn("Skip room action fail:", err);
+    } finally {
+      isTransitioningRef.current = false;
     }
   };
 
   // End Call: Returns initiator to homepage, partner finds a new partner
   const handleEndMatch = async () => {
+    if (isTransitioningRef.current) return;
     try {
+      isTransitioningRef.current = true;
       setStatus('idle');
       setChatMode(null);
       setRoomId(null);
@@ -1010,12 +1043,19 @@ export default function App() {
       setMessages([]);
       cleanupWebRTC();
 
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        setLocalStream(null);
+      }
+
       await appFetch('/api/end', {
         method: 'POST',
         headers: { 'x-user-id': userId }
       });
     } catch (err) {
       console.warn("End action request failing:", err);
+    } finally {
+      isTransitioningRef.current = false;
     }
   };
 
