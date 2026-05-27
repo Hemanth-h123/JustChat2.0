@@ -346,10 +346,11 @@ function Background3D({ theme }: { theme: 'cosmic' | 'neon' | 'matrix' | 'lounge
 // -------------------------------------------------------------
 // INTERACTIVE GLASSMORPHIC 3D TILT CARD COMPONENT
 // -------------------------------------------------------------
-function ActionCard({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
+function ActionCard({ children, className = '', id, style }: { children: React.ReactNode; className?: string; id?: string, style?: React.CSSProperties }) {
   return (
     <div
       id={id}
+      style={style}
       className={`border border-white/10 rounded-2xl bg-zinc-950/80 backdrop-blur-xl shadow-2xl ${className}`}
     >
       {children}
@@ -384,11 +385,12 @@ export default function App() {
   const [showTermsModal, setShowTermsModal] = useState(false);
 
   // Interests Tags State
-  const [interests, setInterests] = useState<string[]>(['gaming', 'music', 'coding']);
+  const [interests, setInterests] = useState<string[]>([]);
   const [interestInput, setInterestInput] = useState('');
 
   // 3D customization & Profile elements
   const [selected3DTheme, setSelected3DTheme] = useState<'cosmic' | 'neon' | 'matrix' | 'lounge'>('cosmic');
+  const [isChatSlideoutOpen, setIsChatSlideoutOpen] = useState(false);
   const [isProfileVerified, setIsProfileVerified] = useState(false);
   const [verificationStep, setVerificationStep] = useState<'idle' | 'pose_prompt' | 'scanning' | 'verified'>('idle');
   const [selectedGesture, setSelectedGesture] = useState('✌️ Peace Sign');
@@ -1297,23 +1299,24 @@ export default function App() {
         <div className="flex-1 w-full max-w-4xl mx-auto px-4 py-8 flex flex-col justify-center items-center gap-8 min-h-0 animate-fade-in" id="homepage_container">
           
           <div className="text-center space-y-2 max-w-lg">
-            <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-teal-400 font-bold text-[9px] rounded-full uppercase tracking-widest font-mono shadow-sm shadow-teal-500/10">
+            <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-teal-400 font-bold text-[9px] rounded-full uppercase tracking-widest font-mono shadow-sm shadow-teal-500/10 backdrop-blur-md">
               ⚡ WebRTC Hyper-Space Active
             </span>
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-mono drop-shadow-[0_4px_12px_rgba(255,255,255,0.1)]">JustChat</h1>
-            <p className="text-xs sm:text-sm text-zinc-400 font-light max-w-md mx-auto">
+            <h1 style={{ backgroundColor: '#84f1f0' }} className="text-5xl sm:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-blue-200 via-blue-400 to-blue-700 font-mono drop-shadow-[0_4px_16px_rgba(59,130,246,0.5)]">JustChat</h1>
+            <p className="text-xs sm:text-sm text-zinc-300/80 font-light max-w-md mx-auto">
               Dynamic matching on encrypted streams. Pick a connection protocol and align tag parameters to peer with the space.
             </p>
           </div>
 
           {/* Central Homepage Control Dashboard */}
-          <ActionCard className="w-full max-w-2xl p-5 sm:p-6 shadow-2xl space-y-6 bg-zinc-950/80 border border-white/8 backdrop-blur-xl relative overflow-hidden rounded-2xl">
-            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          <ActionCard style={{ backgroundColor: 'transparent' }} className="w-full max-w-2xl p-5 sm:p-6 shadow-[0_8px_32px_0_rgba(255,255,255,0.15)] border border-white/30 backdrop-blur-2xl relative overflow-hidden rounded-2xl text-zinc-100">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none mix-blend-overlay" />
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/50 to-transparent" />
             
             {/* Alias / Nickname Section */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/5 border border-white/10 p-3.5 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/5 border border-white/10 p-3.5 rounded-xl backdrop-blur-md">
               <div className="space-y-0.5">
-                <span className="text-[9px] font-bold text-zinc-500 uppercase font-mono">Your Alias Profile</span>
+                <span className="text-[9px] font-bold text-zinc-400 uppercase font-mono">Your Alias Profile</span>
                 <p className="text-sm font-semibold font-mono text-zinc-100 flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping absolute" />
                   <span className="h-2 w-2 rounded-full bg-emerald-500 relative" />
@@ -1321,45 +1324,45 @@ export default function App() {
                 </p>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative z-10">
                 <input 
                   type="text" 
                   placeholder="Set Nickname..."
                   value={userName}
                   onChange={(e) => handleNicknameChange(e.target.value)}
-                  className="px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-white/30"
+                  className="px-3 py-1.5 bg-black/40 border border-white/10 text-zinc-200 rounded-lg text-xs font-mono focus:outline-none focus:border-white/30 backdrop-blur-md"
                 />
               </div>
             </div>
 
             {/* Interest setting parameters */}
-            <div className="space-y-3">
+            <div className="space-y-3 relative z-10">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest flex items-center gap-1.5 font-mono">
                   <Tag className="w-3.5 h-3.5 text-teal-400" /> Match Interests & Tags
                 </span>
-                <span className="text-[9px] text-zinc-500 font-mono">Shared intersections prioritized</span>
+                <span className="text-[9px] text-zinc-400 font-mono">Shared intersections prioritized</span>
               </div>
 
               {/* current tags */}
-              <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2.5 bg-black/40 border border-white/5 rounded-xl">
+              <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2.5 bg-black/30 border border-white/10 rounded-xl backdrop-blur-md">
                 {interests.map((tag) => (
                   <span 
                     key={tag} 
-                    className="inline-flex items-center bg-white/5 border border-white/10 rounded-lg px-2.5 py-0.5 text-xs text-zinc-205 font-mono gap-1 hover:border-white/20 transition-all shadow-sm"
+                    className="inline-flex items-center bg-white/10 border border-white/10 rounded-lg px-2.5 py-0.5 text-xs text-white font-mono gap-1 hover:border-white/30 transition-all shadow-sm"
                   >
                     <span className="text-teal-400">#</span>
                     <span>{tag}</span>
                     <button 
                       onClick={() => handleRemoveInterest(tag)}
-                      className="p-0.5 hover:bg-white/10 rounded text-zinc-500 hover:text-red-400 cursor-pointer"
+                      className="p-0.5 hover:bg-white/20 rounded text-zinc-300 hover:text-red-400 cursor-pointer"
                     >
                       <X className="w-2.5 h-2.5" />
                     </button>
                   </span>
                 ))}
                 {interests.length === 0 && (
-                  <span className="text-[10px] text-zinc-500 italic font-mono p-1">No interest tags configured. Swiping global pools.</span>
+                  <span className="text-[10px] text-zinc-400/80 italic font-mono p-1">No interest tags configured. Swiping global pools.</span>
                 )}
               </div>
 
@@ -1369,12 +1372,12 @@ export default function App() {
                   placeholder="Enter tags (e.g., coding, lofi, gaming, travel, music)..."
                   value={interestInput}
                   onChange={(e) => setInterestInput(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-black/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30 text-xs font-mono text-zinc-200"
+                  className="flex-1 px-3 py-2 bg-black/30 border border-white/10 rounded-lg focus:outline-none focus:border-white/30 text-xs font-mono text-zinc-200 backdrop-blur-md"
                   id="tag_creator_input"
                 />
                 <button 
                   type="submit"
-                  className="px-4 bg-white/10 border border-white/10 font-bold hover:bg-white/20 text-zinc-100 text-xs rounded-lg transition font-mono cursor-pointer"
+                  className="px-4 bg-white/10 border border-white/10 font-bold hover:bg-white/20 text-zinc-100 text-xs rounded-lg transition font-mono cursor-pointer backdrop-blur-md"
                 >
                   Add Tag
                 </button>
@@ -1382,25 +1385,26 @@ export default function App() {
             </div>
 
             {/* Selector Grid for Video vs Text Chat */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-2 relative z-10">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-mono">Choose Matching Protocol</span>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. VIDEO CHAT SELECTION CARD WITH GLASS GLOW */}
                 <div 
                   onClick={() => startChatMatchmaking('video')}
-                  className="p-5 rounded-xl bg-gradient-to-b from-white/5 to-white/[0.01] border border-white/10 hover:border-teal-400/40 hover:from-white/10 transition-all duration-300 text-left relative cursor-pointer group shadow-lg"
+                  className="p-5 rounded-xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 hover:border-teal-400/50 hover:from-white/20 transition-all duration-300 text-left relative cursor-pointer group shadow-lg backdrop-blur-md overflow-hidden"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 bg-white/10 flex items-center justify-center rounded-lg text-teal-400 border border-white/10 group-hover:bg-teal-400 group-hover:text-black transition">
+                  <div className="absolute inset-0 bg-teal-400/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center justify-between mb-3 relative z-10">
+                    <div className="w-9 h-9 bg-white/10 flex items-center justify-center rounded-lg text-teal-300 border border-white/10 group-hover:bg-teal-400 group-hover:text-black transition">
                       <Video className="w-4.5 h-4.5" />
                     </div>
-                    <span className="text-[8px] border border-white/10 text-teal-400 bg-black/60 px-2 py-0.5 rounded-full uppercase font-bold font-mono group-hover:border-teal-400/30 transition">
+                    <span className="text-[8px] border border-white/20 text-teal-300 bg-black/40 px-2 py-0.5 rounded-full uppercase font-bold font-mono group-hover:border-teal-400/50 transition">
                       WebRTC cam
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold font-mono text-white mb-1">Start Video Chat</h3>
-                  <p className="text-[10px] text-zinc-400 leading-normal font-sans">
+                  <h3 className="text-sm font-bold font-mono text-white mb-1 relative z-10 drop-shadow-md">Start Video Chat</h3>
+                  <p className="text-[10px] text-zinc-300 leading-normal font-sans relative z-10">
                     Match with human peers over an interactive encrypted streaming video channel feed.
                   </p>
                 </div>
@@ -1408,18 +1412,19 @@ export default function App() {
                 {/* 2. TEXT CHAT SELECTION CARD WITH GLASS GLOW */}
                 <div 
                   onClick={() => startChatMatchmaking('text')}
-                  className="p-5 rounded-xl bg-gradient-to-b from-white/5 to-white/[0.01] border border-white/10 hover:border-indigo-400/40 hover:from-white/10 transition-all duration-300 text-left relative cursor-pointer group shadow-lg"
+                  className="p-5 rounded-xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 hover:border-indigo-400/50 hover:from-white/20 transition-all duration-300 text-left relative cursor-pointer group shadow-lg backdrop-blur-md overflow-hidden"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 bg-white/10 flex items-center justify-center rounded-lg text-indigo-400 border border-white/10 group-hover:bg-indigo-400 group-hover:text-black transition">
+                  <div className="absolute inset-0 bg-indigo-400/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center justify-between mb-3 relative z-10">
+                    <div className="w-9 h-9 bg-white/10 flex items-center justify-center rounded-lg text-indigo-300 border border-white/10 group-hover:bg-indigo-400 group-hover:text-black transition">
                       <MessageSquare className="w-4.5 h-4.5" />
                     </div>
-                    <span className="text-[8px] border border-white/10 text-indigo-400 bg-black/60 px-2 py-0.5 rounded-full uppercase font-bold font-mono group-hover:border-indigo-400/30 transition">
+                    <span className="text-[8px] border border-white/20 text-indigo-300 bg-black/40 px-2 py-0.5 rounded-full uppercase font-bold font-mono group-hover:border-indigo-400/50 transition">
                       No Webcam
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold font-mono text-white mb-1">Start Text Chat</h3>
-                  <p className="text-[10px] text-zinc-400 leading-normal font-sans">
+                  <h3 className="text-sm font-bold font-mono text-white mb-1 relative z-10 drop-shadow-md">Start Text Chat</h3>
+                  <p className="text-[10px] text-zinc-300 leading-normal font-sans relative z-10">
                     Plain, elegant messaging chat space. Communicate safely using text log transmissions.
                   </p>
                 </div>
@@ -1427,7 +1432,7 @@ export default function App() {
             </div>
 
             {/* Theme & Profile Verification Options */}
-            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between pt-4 border-t border-white/5">
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between pt-4 border-t border-white/10 relative z-10">
               
               {/* Virtual Background Selection */}
               <div className="flex items-center gap-2">
@@ -1561,11 +1566,11 @@ export default function App() {
             <>
               {/* IF VIDEO MODE: Left column video tracks split cards */}
               {chatMode === 'video' && (
-                <section className="col-span-full lg:col-span-7 flex flex-col gap-3 h-auto max-h-[40vh] lg:max-h-none shrink-0">
-                  <div className="flex gap-2 overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-visible">
+                <section className="col-span-full lg:col-span-12 flex flex-col gap-3 shrink-0 relative">
+                  <div className="flex gap-2 overflow-x-auto lg:grid lg:grid-cols-4 lg:grid-rows-1 lg:overflow-visible h-[45vh] lg:h-[65vh]">
                     
                     {/* OWN CAMERA CONTAINER */}
-                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:min-h-[220px] rounded-xl shrink-0">
+                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:col-span-1 rounded-xl shrink-0 h-full">
                       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           You
@@ -1622,7 +1627,7 @@ export default function App() {
                     </ActionCard>
 
                     {/* PEER REMOTE STREAM CONTAINER */}
-                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:min-h-[220px] rounded-xl shrink-0">
+                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:col-span-3 rounded-xl shrink-0 h-full">
                       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           Partner
@@ -1698,6 +1703,13 @@ export default function App() {
                         <ChevronRight className="w-3.5 h-3.5" />
                         <span>Skip Partner</span>
                       </button>
+                      <button 
+                        onClick={() => setIsChatSlideoutOpen(!isChatSlideoutOpen)}
+                        className="px-4 py-2 bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-500/30 text-indigo-400 font-bold rounded text-xs font-mono transition inline-flex items-center gap-1 animate-fade-in cursor-pointer"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5 bg-[#0A0A0A] p-1.5 rounded border border-[#1F1F1F]">
@@ -1723,7 +1735,7 @@ export default function App() {
               )}
 
               {/* CHATING MESSAGING BLOCK */}
-              <section className={`${chatMode === 'video' ? 'col-span-full lg:col-span-5' : 'col-span-full lg:col-span-12 max-w-2xl mx-auto w-full'} flex-1 flex flex-col min-h-0 transition`}>
+              <section className={`${chatMode === 'video' ? `fixed top-0 right-0 w-[400px] max-w-[90vw] h-full bg-zinc-950 z-[100] transform transition-transform duration-300 shadow-2xl border-l border-white/10 ${isChatSlideoutOpen ? 'translate-x-0' : 'translate-x-full'}` : 'col-span-full lg:col-span-12 max-w-2xl mx-auto w-full h-[70vh] lg:h-[80vh]'} flex-1 flex flex-col min-h-0 transition`}>
                 <div className="bg-[#141414] border border-[#1F1F1F] rounded flex-1 flex flex-col overflow-hidden shadow-sm h-full">
                   
                   {/* Top Header of Chat Panel */}
@@ -1744,12 +1756,21 @@ export default function App() {
 
                     <div className="flex items-center gap-1.5">
                       {partner?.interests.map(i => (
-                        <span key={i} className="text-[9px] bg-[#0A0A0A] border border-[#1F1F1F] text-zinc-400 px-1.5 py-0.2 rounded font-mono">
+                        <span key={i} className="text-[9px] bg-[#0A0A0A] border border-[#1F1F1F] text-zinc-400 px-1.5 py-0.2 rounded font-mono hidden sm:inline-block">
                           #{i}
                         </span>
                       ))}
                       {/* Unified Skip and End Controls */}
                       <div className="flex items-center gap-1.5 ml-3 border-l border-[#1F1F1F] pl-3">
+                        {chatMode === 'video' && (
+                          <button 
+                            onClick={() => setIsChatSlideoutOpen(false)}
+                            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-mono transition cursor-pointer flex items-center shadow-md mr-1"
+                            title="Close Chat"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                         <button 
                           onClick={handleSkipMatch}
                           className="px-2.5 py-1 bg-zinc-200 hover:bg-white text-zinc-950 font-bold text-[10px] font-mono rounded-md transition cursor-pointer flex items-center gap-1 shadow-md"

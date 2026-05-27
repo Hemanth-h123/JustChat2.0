@@ -1,6 +1,5 @@
 {
   "name": "JustChat",
   "description": "An anonymous real-time video and text chat platform featuring age verification, interest-based matchmaking, profile verification, interactive 3D virtual background overlays, and a strict administrative moderation dashboard.",
-  "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
