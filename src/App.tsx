@@ -36,10 +36,9 @@ if (typeof window !== 'undefined') {
 
 // Safe API fetch helper to support static host deployments (like GitHub Pages proxying requests to an external self-hosted backend)
 const appFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const apiUrl = (import.meta as any).env.VITE_API_URL;
-  if (apiUrl && typeof input === 'string' && input.startsWith('/api')) {
-    const base = apiUrl.replace(/\/$/, '');
-    return window.fetch(base + input, init);
+  // Always use relative URL by default to reach local express backend
+  if (typeof input === 'string' && input.startsWith('/api')) {
+    return window.fetch(input, init);
   }
   return window.fetch(input, init);
 };
@@ -605,9 +604,6 @@ export default function App() {
     (window as any)._remoteSimIntervalId = intervalId;
     const canvasStream = (canvas as any).captureStream(30);
     setRemoteStream(canvasStream);
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = canvasStream;
-    }
     return intervalId;
   };
 
@@ -627,9 +623,6 @@ export default function App() {
         const alreadyAdded = senders.find(s => s.track === track);
         if (!alreadyAdded) {
           pc.addTrack(track, localStream);
-          // If we add a track late, we must negotiate again! But simple addition is often enough if SDP is already renegotiating,
-          // though typically renegotiation is required. We can just add them and let the ICE state handle it, or we simply rely on the fact 
-          // that setupWebRTCPeerConnection will add them reliably if we just wait properly.
         }
       });
     }
@@ -639,8 +632,13 @@ export default function App() {
     if (remoteVideoRef.current && remoteStream) {
       if (remoteVideoRef.current.srcObject !== remoteStream) {
         remoteVideoRef.current.srcObject = remoteStream;
+        // Only try to play if we just attached it
+        remoteVideoRef.current.play().catch(e => {
+          if (e.name !== 'AbortError') {
+             console.warn("Autoplay blocked for remote stream:", e);
+          }
+        });
       }
-      remoteVideoRef.current.play().catch(e => console.warn("Autoplay blocked for remote stream:", e));
     }
   }, [remoteStream, status, chatMode]);
 
@@ -676,6 +674,11 @@ export default function App() {
         if (response.status === 403) {
           setSysBanned(true);
           setStatus('idle');
+          return;
+        }
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
           return;
         }
 
@@ -738,8 +741,10 @@ export default function App() {
             }
           }
         }
-      } catch (err) {
-        console.error("Poller status failure:", err);
+      } catch (err: any) {
+        if (!err.message?.includes('NetworkError') && !err.message?.includes('Failed to fetch')) {
+          console.error("Poller status failure:", err);
+        }
       }
     }, 1500);
 
@@ -758,14 +763,20 @@ export default function App() {
           headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
           body: JSON.stringify({ interests, chatMode })
         });
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+           return;
+        }
         const data = await res.json();
         if (data.state === 'matched' && data.room) {
           setRoomId(data.room.id);
           setStatus('active');
           addSystemMessage("Secure match established successfully!");
         }
-      } catch (err) {
-        console.warn("Queue loop scan fail:", err);
+      } catch (err: any) {
+        if (!err.message?.includes('NetworkError') && !err.message?.includes('Failed to fetch')) {
+          console.warn("Queue loop scan fail:", err);
+        }
       }
     }, 3000);
 
@@ -798,17 +809,11 @@ export default function App() {
         console.log("[WebRTC] Got Remote stream track:", event.track.kind);
         if (event.streams && event.streams[0]) {
           setRemoteStream(event.streams[0]);
-          if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== event.streams[0]) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
         } else {
           setRemoteStream(prev => {
             const stream = prev || new MediaStream();
             if (!stream.getTracks().includes(event.track)) {
               stream.addTrack(event.track);
-            }
-            if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== stream) {
-              remoteVideoRef.current.srcObject = stream;
             }
             return stream;
           });
@@ -881,6 +886,10 @@ export default function App() {
         const res = await appFetch(`/api/signal/poll?role=${role}`, {
           headers: { 'x-user-id': userId }
         });
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+           return;
+        }
         const signal = await res.json();
 
         if (signal.sdp) {
@@ -907,24 +916,14 @@ export default function App() {
             }
           }
         }
-      } catch (err) {
-        console.warn("Signaling poll failed:", err);
+      } catch (err: any) {
+        if (!err.message?.includes('NetworkError') && !err.message?.includes('Failed to fetch')) {
+          console.warn("Signaling poll failed:", err);
+        }
       }
     }, 1500);
     (window as any)._signalIntervalId = signalInterval;
   };
-
-  // Re-attach media streams to video elements when they remount
-  useEffect(() => {
-    if (status === 'active' && chatMode === 'video') {
-      if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
-      if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-    }
-  }, [status, chatMode, localStream, remoteStream]);
 
   // Clean WebRTC and intervals
   const cleanupWebRTC = () => {
