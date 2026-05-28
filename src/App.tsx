@@ -423,6 +423,21 @@ export default function App() {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const isTransitioningRef = useRef(false);
 
+  // Send disconnect on tab close/refresh to immediately free partner
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const apiUrl = (import.meta as any).env.VITE_API_URL;
+      const base = typeof apiUrl === 'string' ? apiUrl.replace(/\/$/, '') : '';
+      fetch(`${base}/api/disconnect`, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'x-user-id': userId }
+      }).catch(() => {});
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [userId]);
+
   // Save nickname updates to local storage
   const handleNicknameChange = (newVal: string) => {
     setUserName(newVal);
@@ -684,6 +699,13 @@ export default function App() {
         setOnlineCount(data.onlineCount || 1);
 
         if (response.ok) {
+          if (data.chatMode && !chatMode) {
+            setChatMode(data.chatMode);
+            if (data.chatMode === 'video' && !localStream) {
+               setupMedia();
+            }
+          }
+
           if (data.status === 'offline') {
             // Server forgot us (e.g. restart), re-register silently
             const resolvedName = userName.trim() || 'Anonymous Human';
@@ -696,6 +718,12 @@ export default function App() {
           }
 
           if (data.status === 'active' && data.room) {
+            // If the room changed from under us (e.g. instantly rematched while we were polling), clean up old WebRTC
+            if (roomId && roomId !== data.room.id) {
+              cleanupWebRTC();
+              setRemoteStream(null);
+            }
+            
             setRoomId(data.room.id);
             setPartner(data.partner);
             setStatus('active');
@@ -747,7 +775,7 @@ export default function App() {
     }, 1500);
 
     return () => clearInterval(interval);
-  }, [isAgeVerified, status, userId, chatMode, localStream, remoteStream]);
+  }, [isAgeVerified, status, userId, chatMode, localStream, remoteStream, roomId]);
 
   // Periodic automated matchmaking scans (Check matching list every 3s so users pair instantly)
   useEffect(() => {

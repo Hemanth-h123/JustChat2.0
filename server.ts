@@ -16,6 +16,7 @@ interface User {
   lastSeen: number;
   chatMode?: 'video' | 'text' | null;
   matchingStartedAt?: number;
+  lastPartnerId?: string | null;
 }
 
 interface Room {
@@ -79,9 +80,14 @@ function closeRoom(roomId: string, leavingUserId: string) {
   if (room) {
     const partnerId = room.hostId === leavingUserId ? room.guestId : room.hostId;
     const partner = activeUsers.get(partnerId);
+    const leaver = activeUsers.get(leavingUserId);
+    
+    if (leaver) leaver.lastPartnerId = partnerId;
+
     if (partner) {
       partner.roomId = null;
       partner.status = 'idle';
+      partner.lastPartnerId = leavingUserId;
     }
     rooms.delete(roomId);
     console.log(`[Server] Closed room ${roomId} because ${leavingUserId} left`);
@@ -183,6 +189,7 @@ async function startServer() {
 
     res.json({
       status: user.status,
+      chatMode: user.chatMode,
       onlineCount: activeUsers.size, // Real user count, no simulation padding
       room: roomDetails,
       partner: partnerDetails
@@ -278,7 +285,10 @@ async function startServer() {
       other => other.id !== userId && 
                other.status === 'matching' && 
                other.chatMode === user.chatMode &&
-               !other.id.startsWith('sim_')
+               !other.id.startsWith('sim_') &&
+               other.id !== user.lastPartnerId 
+               // Note: We don't need to check other.lastPartnerId if we just check user.lastPartnerId, 
+               // but it doesn't hurt. Since they both skipped each other, both have each other as lastPartnerId.
     );
 
     if (matchPool.length > 0) {
@@ -344,11 +354,13 @@ async function startServer() {
         user.roomId = null;
         user.status = 'matching';
         user.matchingStartedAt = Date.now();
+        user.lastPartnerId = partnerId;
 
         if (partner) {
           partner.roomId = null;
           partner.status = 'matching';
           partner.matchingStartedAt = Date.now();
+          partner.lastPartnerId = userId;
           console.log(`[Server] Skip: Both ${user.name} and ${partner.name} placed back into matching queue.`);
         }
       } else {
@@ -384,11 +396,13 @@ async function startServer() {
         user.status = 'idle';
         user.chatMode = null;
         user.matchingStartedAt = undefined;
+        user.lastPartnerId = partnerId;
 
         if (partner) {
           partner.roomId = null;
           partner.status = 'matching';
           partner.matchingStartedAt = Date.now();
+          partner.lastPartnerId = userId;
           console.log(`[Server] End Call: ${user.name} returned to home. Partner ${partner.name} placed back in matching queue.`);
         }
       } else {
