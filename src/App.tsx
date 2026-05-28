@@ -51,18 +51,15 @@ function Background3D({ theme }: { theme: 'cosmic' | 'neon' | 'matrix' | 'lounge
 
   useEffect(() => {
     if (!containerRef.current) return;
-
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
     
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(theme === 'neon' ? 0xf43f5e : 0x020205, 0.015);
 
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
     camera.position.set(0, 0, 32);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
+    // Don't set initial size until ResizeObserver fires, avoiding forced layout
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     
     containerRef.current.innerHTML = '';
@@ -320,20 +317,21 @@ function Background3D({ theme }: { theme: 'cosmic' | 'neon' | 'matrix' | 'lounge
 
     animate();
 
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      const w = containerRef.current.clientWidth;
-      const h = containerRef.current.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-
-    window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+          renderer.setSize(width, height);
+        }
+      }
+    });
+    resizeObserver.observe(containerRef.current);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       window.removeEventListener('mousemove', handleMouseMove);
       renderer.dispose();
     };
