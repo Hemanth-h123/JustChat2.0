@@ -444,6 +444,16 @@ export default function App() {
     localStorage.setItem('justchat_username', newVal);
   };
 
+  // On initial load, try to clear any stale state on the server so we don't jump into a room without user interaction.
+  useEffect(() => {
+    if (userId) {
+      appFetch('/api/disconnect', {
+        method: 'POST',
+        headers: { 'x-user-id': userId }
+      }).catch(() => {});
+    }
+  }, [userId]);
+
   // Setup Webcam streams for video chat
   const setupMedia = async () => {
     try {
@@ -1707,7 +1717,7 @@ export default function App() {
                       {partner && (
                         <div className="absolute top-2.5 right-2.5 z-10">
                           <div className="flex gap-1.5">
-                            {partner.interests.slice(0, 2).map((i, id) => (
+                            {partner.interests?.slice(0, 2).map((i: string, id: number) => (
                               <span key={id} className="bg-black/60 border border-white/10 text-zinc-400 text-[8px] px-1.5 py-0.5 font-bold font-mono rounded">
                                 #{i}
                               </span>
@@ -1820,7 +1830,7 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {partner?.interests.map(i => (
+                      {partner?.interests?.map(i => (
                         <span key={i} className="text-[9px] bg-[#0A0A0A] border border-[#1F1F1F] text-zinc-400 px-1.5 py-0.2 rounded font-mono hidden sm:inline-block">
                           #{i}
                         </span>

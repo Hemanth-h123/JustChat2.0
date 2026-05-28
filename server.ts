@@ -269,7 +269,20 @@ async function startServer() {
       user.chatMode = chatMode;
     }
 
-    // Clean up current room if any
+    // If already matched by another user's concurrent match request, return the room!
+    if (user.status === 'active' && user.roomId) {
+      const room = rooms.get(user.roomId);
+      if (room) {
+        res.json({ success: true, state: 'matched', room });
+        return;
+      } else {
+        // Stale room
+        user.roomId = null;
+        user.status = 'matching';
+      }
+    }
+
+    // Clean up current room if any (should only happen if state is out of sync)
     if (user.roomId) {
       closeRoom(user.roomId, userId);
     }
