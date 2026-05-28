@@ -737,7 +737,7 @@ export default function App() {
                 if (!remoteStream && !(window as any)._remoteSimIntervalId) {
                   createMockRemoteMediaStream(data.partner.id);
                 }
-              } else if (!peerConnectionRef.current) {
+              } else if (!peerConnectionRef.current && localStream) {
                 setupWebRTCPeerConnection(data.room.role);
               }
             }
