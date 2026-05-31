@@ -2096,8 +2096,6 @@ export default function App() {
         <div className="flex flex-wrap items-center gap-4">
           <span>SECURE ENCRYPTED HANDSHAKE ACTIVE</span>
           <span>STATE: PROTOCOLS BOUNDED</span>
-          <button onClick={() => setShowAboutModal(true)} className="text-teal-400 hover:text-teal-300 underline cursor-pointer">About Us</button>
-          <button onClick={() => setShowTermsModal(true)} className="text-teal-400 hover:text-teal-300 underline cursor-pointer">Terms & Conditions</button>
         </div>
         <div>
           <span>&copy; {new Date().getFullYear()} JustChat Space • Preserving Authentic Connection.</span>
