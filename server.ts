@@ -294,15 +294,35 @@ async function startServer() {
     user.lastSeen = Date.now();
 
     // Matchmaking Logic: Find other matching real users with the SAME chat mode (video or text)
-    const matchPool = Array.from(activeUsers.values()).filter(
+    let matchPool = Array.from(activeUsers.values()).filter(
       other => other.id !== userId && 
                other.status === 'matching' && 
                other.chatMode === user.chatMode &&
                !other.id.startsWith('sim_') &&
                other.id !== user.lastPartnerId 
-               // Note: We don't need to check other.lastPartnerId if we just check user.lastPartnerId, 
-               // but it doesn't hurt. Since they both skipped each other, both have each other as lastPartnerId.
     );
+
+    // Fallback: If no strict match found, check if there is only 1 other user matching
+    if (matchPool.length === 0) {
+      const allOtherMatchingRealUsers = Array.from(activeUsers.values()).filter(
+        other => other.id !== userId &&
+                 other.status === 'matching' &&
+                 !other.id.startsWith('sim_')
+      );
+      
+      const now = Date.now();
+      const userWaitTime = now - (user.matchingStartedAt || now);
+
+      if (allOtherMatchingRealUsers.length === 1) {
+        const other = allOtherMatchingRealUsers[0];
+        const otherWaitTime = now - (other.matchingStartedAt || now);
+        
+        // Connect them if they've been waiting for long, or if they skipped each other recently, or even if different chat mode.
+        if (userWaitTime > 3000 || otherWaitTime > 3000 || user.lastPartnerId === other.id || other.chatMode !== user.chatMode) {
+          matchPool = [other];
+        }
+      }
+    }
 
     if (matchPool.length > 0) {
       // Sort candidates by common interest count
