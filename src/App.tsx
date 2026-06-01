@@ -893,16 +893,6 @@ export default function App() {
         }
       };
 
-      if (role === 'host') {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await appFetch('/api/signal/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
-          body: JSON.stringify({ sdp: offer, role })
-        });
-      }
-
       pollIceAndSdp(role);
 
     } catch (err) {
@@ -914,6 +904,9 @@ export default function App() {
     if ((window as any)._signalIntervalId) {
       clearInterval((window as any)._signalIntervalId);
     }
+    // Track added ICE candidates by their candidate string to avoid duplicate additions
+    const processedIce = new Set<string>();
+
     const signalInterval = setInterval(async () => {
       const pc = peerConnectionRef.current;
       if (!pc) {
@@ -946,12 +939,17 @@ export default function App() {
           }
         }
 
-        if (signal.ice && signal.ice.length > 0) {
+        // Only add ICE candidate if remote description is set and we haven't added it yet
+        if (signal.ice && signal.ice.length > 0 && pc.remoteDescription) {
           for (const cand of signal.ice) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
-            } catch (e) {
-              // skip cand
+            const candKey = cand.candidate || JSON.stringify(cand);
+            if (!processedIce.has(candKey)) {
+              processedIce.add(candKey);
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {
+                console.warn("Failed to add ICE candidate:", e);
+              }
             }
           }
         }
@@ -1001,9 +999,9 @@ export default function App() {
   };
 
   // Start selected chat matchmaking mode
-  const startChatMatchmaking = async (mode: 'video' | 'text') => {
+  const startChatMatchmaking = async (mode: 'video' | 'text', forceBypassAgeCheck = false) => {
     if (sysBanned) return;
-    if (!isAgeVerified) {
+    if (!isAgeVerified && !forceBypassAgeCheck) {
       setPendingChatMode(mode);
       setShowAgeGate(true);
       return;
@@ -1200,7 +1198,7 @@ export default function App() {
         
         // Auto navigate or match for the requested mode
         if (pendingChatMode) {
-          startChatMatchmaking(pendingChatMode);
+          startChatMatchmaking(pendingChatMode, true);
           setPendingChatMode(null);
         }
       } else {
