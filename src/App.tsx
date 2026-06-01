@@ -866,6 +866,12 @@ export default function App() {
 
       pc.oniceconnectionstatechange = () => {
         console.log("[WebRTC] ICE Connection State:", pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+           if ((window as any)._signalIntervalId) {
+             clearInterval((window as any)._signalIntervalId);
+             (window as any)._signalIntervalId = null;
+           }
+        }
         if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
           // You might try to restart ICE here, but for now we log it.
           console.warn("[WebRTC] WebRTC connection failed or disconnected.");

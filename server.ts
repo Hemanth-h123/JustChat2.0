@@ -489,13 +489,13 @@ async function startServer() {
 
     const user = activeUsers.get(userId);
     if (!user || !user.roomId) {
-      res.status(404).json({ error: "No active room to signal" });
+      res.json({ error: "No active room to signal" });
       return;
     }
 
     const room = rooms.get(user.roomId);
     if (!room) {
-       res.status(404).json({ error: "Room not found" });
+       res.json({ error: "Room not found" });
        return;
     }
 
