@@ -787,11 +787,21 @@ export default function App() {
               setRoomId(null);
               setPartner(null);
               setRemoteStream(null);
+              setChatMode(null);
+              if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                setLocalStream(null);
+              }
             } else if (status !== 'matching') {
               setStatus('idle');
               setRoomId(null);
               setPartner(null);
               setRemoteStream(null);
+              setChatMode(null);
+              if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                setLocalStream(null);
+              }
             }
           }
         }
@@ -844,7 +854,9 @@ export default function App() {
       const configuration: RTCConfiguration = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
         ]
       };
       
@@ -1164,7 +1176,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
         body: JSON.stringify({
-          reportedUserId: partner.id,
+          reportedUserId: partner?.id || 'unknown',
           reason: reportReason,
           details: reportDetails
         })
@@ -1286,9 +1298,9 @@ export default function App() {
           <button 
             onClick={() => {
               if (status === 'active' || status === 'matching') {
-                if (stream) {
-                  stream.getTracks().forEach(t => t.stop());
-                  setStream(null);
+                if (localStream) {
+                  localStream.getTracks().forEach(t => t.stop());
+                  setLocalStream(null);
                 }
               }
               setChatMode(null);
@@ -1682,7 +1694,7 @@ export default function App() {
                   <div className="relative flex flex-col lg:grid lg:grid-cols-2 lg:grid-rows-1 gap-2 h-[45vh] lg:h-[65vh]">
                     
                     {/* PEER REMOTE STREAM CONTAINER (Moved to top so PIP user camera appears over it) */}
-                    <ActionCard className={`bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden min-h-0 min-w-0 lg:col-span-1 rounded-xl shrink-0 h-full ${isChatSlideoutOpen ? 'max-lg:absolute max-lg:inset-0 max-lg:z-0' : 'max-lg:flex-1'}`}>
+                    <ActionCard className={`bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden min-h-0 min-w-0 lg:col-span-1 rounded-xl shrink-0 h-full max-lg:absolute max-lg:inset-0 max-lg:z-0 lg:flex-1`}>
                       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           Partner
@@ -1696,7 +1708,7 @@ export default function App() {
 
                       {partner && (
                         <div className="absolute top-2.5 right-2.5 z-10">
-                          <div className={`flex gap-1.5 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                          <div className={`flex gap-1.5 max-lg:hidden`}>
                             {(partner.interests || []).slice(0, 2).map((i: string, id: number) => (
                               <span key={id} className="bg-black/60 border border-white/10 text-zinc-400 text-[8px] px-1.5 py-0.5 font-bold font-mono rounded">
                                 #{i}
@@ -1706,7 +1718,7 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5">
+                      <div className={`w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5 max-lg:m-0`}>
                         {remoteStream ? (
                           <video 
                             ref={remoteVideoRef} 
@@ -1723,7 +1735,7 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className={`w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                      <div className={`w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500 max-lg:hidden`}>
                         <span className="truncate">{partner ? `Connecting: ${partner.name}` : 'Handshake...'}</span>
                         
                         {partner && (
@@ -1740,8 +1752,8 @@ export default function App() {
                     </ActionCard>
 
                     {/* OWN CAMERA CONTAINER */}
-                    <ActionCard className={`bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden min-h-0 min-w-0 lg:col-span-1 rounded-xl shrink-0 h-full ${isChatSlideoutOpen ? 'max-lg:absolute max-lg:bottom-2 max-lg:right-2 max-lg:w-[120px] max-lg:h-[160px] max-lg:z-50' : 'max-lg:flex-1'}`}>
-                      <div className={`absolute top-2.5 left-2.5 z-10 flex items-center gap-1 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                    <ActionCard className={`bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden min-h-0 min-w-0 lg:col-span-1 rounded-xl shrink-0 h-full max-lg:absolute max-lg:bottom-2 max-lg:right-2 max-lg:w-[120px] max-lg:h-[160px] max-lg:z-50 lg:flex-1`}>
+                      <div className={`absolute top-2.5 left-2.5 z-10 flex items-center gap-1 max-lg:hidden`}>
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           You
                         </span>
@@ -1752,13 +1764,13 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className={`absolute top-2.5 right-2.5 z-10 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                      <div className={`absolute top-2.5 right-2.5 z-10 max-lg:hidden`}>
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-500 text-[8px] font-bold font-mono rounded uppercase">
                           Theme: {selected3DTheme}
                         </span>
                       </div>
 
-                      <div className={`w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 ${isChatSlideoutOpen ? 'max-lg:m-0' : 'my-0.5'}`}>
+                      <div className={`w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5 max-lg:m-0`}>
                         <video 
                           ref={localVideoRef} 
                           autoPlay 
@@ -1768,13 +1780,13 @@ export default function App() {
                         />
                         {(!cameraActive || !localStream) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono">
-                            <VideoOff className={`w-6 h-6 mb-1 text-zinc-600 ${isChatSlideoutOpen ? 'max-lg:w-4 max-lg:h-4 max-lg:mb-0' : ''}`} />
-                            <span className={`${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>Cam offline</span>
+                            <VideoOff className={`w-6 h-6 mb-1 text-zinc-600 max-lg:w-4 max-lg:h-4 max-lg:mb-0`} />
+                            <span className={`max-lg:hidden`}>Cam offline</span>
                           </div>
                         )}
                       </div>
 
-                      <div className={`w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                      <div className={`w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500 max-lg:hidden`}>
                         <span className="truncate">Handshake cam: secure</span>
                         
                         <div className="flex gap-1 shrink-0 ml-1">
@@ -1905,7 +1917,7 @@ export default function App() {
 
                   {/* Messages Stream Container */}
                   <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[#0D0D0D]">
-                    {messages.length === 0 && (
+                    {messages.length === 0 && !partnerTyping && (
                       <div className="h-full flex flex-col items-center justify-center text-center p-5 text-zinc-650 space-y-1.5">
                         <MessageSquare className="w-7 h-7 text-zinc-800" />
                         <div className="space-y-0.5 max-w-xs">
@@ -2077,7 +2089,7 @@ export default function App() {
               <div className="space-y-4 font-sans">
                 <div className="bg-[#0A0A0A] p-2.5 rounded border border-[#1F1F1F] space-y-0.5">
                   <span className="text-[8px] text-zinc-520 uppercase font-mono block">Suspect Session key:</span>
-                  <span className="text-[10px] text-zinc-350 font-mono block break-all font-semibold select-all">{partner.id}</span>
+                  <span className="text-[10px] text-zinc-350 font-mono block break-all font-semibold select-all">{partner?.id || 'Unknown'}</span>
                 </div>
 
                 <div className="space-y-1">
