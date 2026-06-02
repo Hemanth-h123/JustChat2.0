@@ -27,6 +27,8 @@ interface Room {
   guestIce: any[];
   hostSdp: any;
   guestSdp: any;
+  hostTyping?: number;
+  guestTyping?: number;
   messages: Array<{ id: string; sender: string; text: string; time: number }>;
   created: number;
   lastActivity: number;
@@ -527,7 +529,40 @@ async function startServer() {
        return;
     }
 
-    res.json({ messages: room.messages });
+    const isHost = room.hostId === userId;
+    const now = Date.now();
+    let partnerTyping = false;
+    
+    if (isHost && room.guestTyping && now - room.guestTyping < 3000) {
+      partnerTyping = true;
+    } else if (!isHost && room.hostTyping && now - room.hostTyping < 3000) {
+      partnerTyping = true;
+    }
+
+    res.json({ messages: room.messages, partnerTyping });
+  });
+
+  app.post('/api/chat/typing', (req, res) => {
+    const userId = req.headers['x-user-id'] as string;
+    const user = activeUsers.get(userId);
+    if (!user || !user.roomId) {
+       res.json({ success: false });
+       return;
+    }
+
+    const room = rooms.get(user.roomId);
+    if (!room) {
+       res.json({ success: false });
+       return;
+    }
+
+    if (room.hostId === userId) {
+      room.hostTyping = Date.now();
+    } else {
+      room.guestTyping = Date.now();
+    }
+
+    res.json({ success: true });
   });
 
   app.post('/api/chat/send', (req, res) => {
@@ -552,6 +587,11 @@ async function startServer() {
     }
 
     room.lastActivity = Date.now();
+    if (room.hostId === userId) {
+      room.hostTyping = undefined;
+    } else {
+      room.guestTyping = undefined;
+    }
 
     const newMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,

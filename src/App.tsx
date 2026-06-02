@@ -408,7 +408,25 @@ export default function App() {
 
   // Chat Log State
   const [messages, setMessages] = useState<Array<{ id: string; sender: string; text: string; time: number }>>([]);
+  const [partnerTyping, setPartnerTyping] = useState(false);
   const [messageInput, setMessageInput] = useState('');
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMessageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessageInput(e.target.value);
+    
+    // Throttle typing events
+    if (!typingTimeoutRef.current && status === 'active' && e.target.value.trim() !== '') {
+      appFetch('/api/chat/typing', {
+        method: 'POST',
+        headers: { 'x-user-id': userId }
+      });
+      
+      typingTimeoutRef.current = setTimeout(() => {
+        typingTimeoutRef.current = null;
+      }, 1500);
+    }
+  };
 
   // Moderation Dialog Panels
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -994,6 +1012,7 @@ export default function App() {
           return data.messages;
         });
       }
+      setPartnerTyping(data.partnerTyping || false);
     } catch (err) {
       console.warn("Message sync fail:", err);
     }
@@ -1660,67 +1679,10 @@ export default function App() {
               {/* IF VIDEO MODE: Left column video tracks split cards */}
               {chatMode === 'video' && (
                 <section className="col-span-full lg:col-span-12 flex flex-col gap-3 shrink-0 relative">
-                  <div className="flex gap-2 overflow-x-auto lg:grid lg:grid-cols-4 lg:grid-rows-1 lg:overflow-visible h-[45vh] lg:h-[65vh]">
+                  <div className="relative flex flex-col lg:grid lg:grid-cols-2 lg:grid-rows-1 gap-2 h-[45vh] lg:h-[65vh]">
                     
-                    {/* OWN CAMERA CONTAINER */}
-                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:col-span-1 rounded-xl shrink-0 h-full">
-                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
-                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
-                          You
-                        </span>
-                        {isProfileVerified && (
-                          <span className="bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold font-mono px-1 py-0.5 rounded">
-                            VERIFIED
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="absolute top-2.5 right-2.5 z-10">
-                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-500 text-[8px] font-bold font-mono rounded uppercase">
-                          Theme: {selected3DTheme}
-                        </span>
-                      </div>
-
-                      <div className="w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5">
-                        <video 
-                          ref={localVideoRef} 
-                          autoPlay 
-                          playsInline 
-                          muted 
-                          className={`w-full h-full object-contain sm:object-cover ${cameraActive ? 'scale-x-[-1]' : 'hidden'}`}
-                        />
-                        {(!cameraActive || !localStream) && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono">
-                            <VideoOff className="w-6 h-6 mb-1 text-zinc-600" />
-                            <span>Cam offline</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500">
-                        <span className="truncate">Handshake cam: secure</span>
-                        
-                        <div className="flex gap-1 shrink-0 ml-1">
-                          <button 
-                            onClick={toggleMic}
-                            className={`p-1 rounded border transition cursor-pointer ${micActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
-                            title={micActive ? "Mute Microphone" : "Unmute Microphone"}
-                          >
-                            {micActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                          </button>
-                          <button 
-                            onClick={toggleCamera}
-                            className={`p-1 rounded border transition cursor-pointer ${cameraActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
-                            title={cameraActive ? "Mute Video" : "Unmute Video"}
-                          >
-                            {cameraActive ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-                    </ActionCard>
-
-                    {/* PEER REMOTE STREAM CONTAINER */}
-                    <ActionCard className="bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden flex-1 min-w-[200px] lg:col-span-3 rounded-xl shrink-0 h-full">
+                    {/* PEER REMOTE STREAM CONTAINER (Moved to top so PIP user camera appears over it) */}
+                    <ActionCard className={`bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden min-h-0 min-w-0 lg:col-span-1 rounded-xl shrink-0 h-full ${isChatSlideoutOpen ? 'max-lg:absolute max-lg:inset-0 max-lg:z-0' : 'max-lg:flex-1'}`}>
                       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1">
                         <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
                           Partner
@@ -1734,7 +1696,7 @@ export default function App() {
 
                       {partner && (
                         <div className="absolute top-2.5 right-2.5 z-10">
-                          <div className="flex gap-1.5">
+                          <div className={`flex gap-1.5 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
                             {(partner.interests || []).slice(0, 2).map((i: string, id: number) => (
                               <span key={id} className="bg-black/60 border border-white/10 text-zinc-400 text-[8px] px-1.5 py-0.5 font-bold font-mono rounded">
                                 #{i}
@@ -1761,7 +1723,7 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500">
+                      <div className={`w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
                         <span className="truncate">{partner ? `Connecting: ${partner.name}` : 'Handshake...'}</span>
                         
                         {partner && (
@@ -1774,6 +1736,63 @@ export default function App() {
                             <span className="sm:hidden">Report</span>
                           </button>
                         )}
+                      </div>
+                    </ActionCard>
+
+                    {/* OWN CAMERA CONTAINER */}
+                    <ActionCard className={`bg-zinc-950/80 border border-white/10 p-3 relative flex flex-col justify-between shadow-2xl overflow-hidden min-h-0 min-w-0 lg:col-span-1 rounded-xl shrink-0 h-full ${isChatSlideoutOpen ? 'max-lg:absolute max-lg:bottom-2 max-lg:right-2 max-lg:w-[120px] max-lg:h-[160px] max-lg:z-50' : 'max-lg:flex-1'}`}>
+                      <div className={`absolute top-2.5 left-2.5 z-10 flex items-center gap-1 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-350 text-[8px] font-bold font-mono rounded uppercase">
+                          You
+                        </span>
+                        {isProfileVerified && (
+                          <span className="bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold font-mono px-1 py-0.5 rounded">
+                            VERIFIED
+                          </span>
+                        )}
+                      </div>
+
+                      <div className={`absolute top-2.5 right-2.5 z-10 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                        <span className="px-1.5 py-0.5 bg-black/60 border border-white/10 text-zinc-500 text-[8px] font-bold font-mono rounded uppercase">
+                          Theme: {selected3DTheme}
+                        </span>
+                      </div>
+
+                      <div className={`w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 ${isChatSlideoutOpen ? 'max-lg:m-0' : 'my-0.5'}`}>
+                        <video 
+                          ref={localVideoRef} 
+                          autoPlay 
+                          playsInline 
+                          muted 
+                          className={`w-full h-full object-contain sm:object-cover ${cameraActive ? 'scale-x-[-1]' : 'hidden'}`}
+                        />
+                        {(!cameraActive || !localStream) && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono">
+                            <VideoOff className={`w-6 h-6 mb-1 text-zinc-600 ${isChatSlideoutOpen ? 'max-lg:w-4 max-lg:h-4 max-lg:mb-0' : ''}`} />
+                            <span className={`${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>Cam offline</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={`w-full flex items-center justify-between mt-1 text-[9px] font-mono text-zinc-500 ${isChatSlideoutOpen ? 'max-lg:hidden' : ''}`}>
+                        <span className="truncate">Handshake cam: secure</span>
+                        
+                        <div className="flex gap-1 shrink-0 ml-1">
+                          <button 
+                            onClick={toggleMic}
+                            className={`p-1 rounded border transition cursor-pointer ${micActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
+                            title={micActive ? "Mute Microphone" : "Unmute Microphone"}
+                          >
+                            {micActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                          </button>
+                          <button 
+                            onClick={toggleCamera}
+                            className={`p-1 rounded border transition cursor-pointer ${cameraActive ? 'bg-black/60 hover:bg-white/10 border-white/15 text-zinc-300' : 'bg-red-950/30 border-red-900/40 text-red-400'}`}
+                            title={cameraActive ? "Mute Video" : "Unmute Video"}
+                          >
+                            {cameraActive ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </div>
                     </ActionCard>
 
@@ -1828,7 +1847,7 @@ export default function App() {
               )}
 
               {/* CHATING MESSAGING BLOCK */}
-              <section className={`${chatMode === 'video' ? `fixed top-0 right-0 w-[400px] max-w-[90vw] h-full bg-zinc-950 z-[100] transform transition-transform duration-300 shadow-2xl border-l border-white/10 ${isChatSlideoutOpen ? 'translate-x-0' : 'translate-x-full'}` : 'col-span-full lg:col-span-12 max-w-2xl mx-auto w-full h-[70vh] lg:h-[80vh]'} flex-1 flex flex-col min-h-0 transition`}>
+              <section className={`${chatMode === 'video' ? `fixed inset-x-0 bottom-0 top-1/2 lg:inset-auto lg:top-0 lg:bottom-0 lg:right-0 w-full lg:w-[400px] lg:max-w-none h-1/2 lg:h-full bg-zinc-950 z-[100] transform transition-transform duration-300 shadow-2xl border-t lg:border-t-0 lg:border-l border-white/10 ${isChatSlideoutOpen ? 'translate-y-0 lg:translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}` : 'col-span-full lg:col-span-12 max-w-2xl mx-auto w-full h-[70vh] lg:h-[80vh]'} flex-1 flex flex-col min-h-0 transition`}>
                 <div className="bg-[#141414] border border-[#1F1F1F] rounded flex-1 flex flex-col overflow-hidden shadow-sm h-full">
                   
                   {/* Top Header of Chat Panel */}
@@ -1926,6 +1945,19 @@ export default function App() {
                       );
                     })}
 
+                    {partnerTyping && (
+                      <div className="flex flex-col max-w-[85%] mr-auto items-start animate-fade-in">
+                        <div className="text-[8px] text-zinc-600 font-mono mb-0.5 px-0.5">
+                          {partner?.name || 'Partner'}
+                        </div>
+                        <div className="px-3 py-2 rounded text-xs bg-[#141414] border border-[#1F1F1F] text-zinc-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                          <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                          <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                        </div>
+                      </div>
+                    )}
+
                     <div ref={chatBottomRef} />
                   </div>
 
@@ -1935,7 +1967,7 @@ export default function App() {
                       type="text" 
                       placeholder="Enter transmission message..."
                       value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
+                      onChange={handleMessageInputChange}
                       className="flex-1 px-3 py-1.5 bg-[#0a0a0a] border border-[#1F1F1F] rounded focus:outline-none focus:border-zinc-500 text-xs font-mono text-zinc-250 placeholder-zinc-700"
                     />
                     <button 
