@@ -993,7 +993,8 @@ export default function App() {
       const configuration: RTCConfiguration = {
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun.cloudflare.com:3478" },
+          { urls: "stun:global.stun.twilio.com:3478" }
         ],
       };
 
@@ -1048,7 +1049,8 @@ export default function App() {
         if (pc.iceConnectionState === "failed") {
           // Auto-skip if partner drops off and connection definitively fails
           console.warn("[WebRTC] WebRTC connection failed.");
-          setTimeout(() => handleSkipMatch(), 1500);
+          addSystemMessage("Connection failed. Try testing on two different networks (e.g. mobile vs wifi) if testing locally!");
+          setTimeout(() => handleSkipMatch(), 3500);
         } else if (pc.iceConnectionState === "disconnected") {
           console.warn(
             "[WebRTC] WebRTC connection temporarily disconnected. Waiting to see if it recovers.",
