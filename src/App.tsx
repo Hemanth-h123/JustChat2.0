@@ -876,7 +876,7 @@ export default function App() {
                   createMockRemoteMediaStream(data.partner.id);
                 }
               } else if (!peerConnectionRef.current && localStream) {
-                setupWebRTCPeerConnection(data.room.role);
+                setupWebRTCPeerConnection(data.room.role, data.partner.id);
               }
             }
           } else if (data.status === "matching") {
@@ -987,7 +987,7 @@ export default function App() {
   }, [status, userId, interests, chatMode]);
 
   // WebRTC Peer Connection Logic
-  const setupWebRTCPeerConnection = async (role: "host" | "guest") => {
+  const setupWebRTCPeerConnection = async (role: "host" | "guest", partnerId: string) => {
     try {
       console.log(`[WebRTC] Set up signaling peer as ${role}`);
       const configuration: RTCConfiguration = {
@@ -1049,8 +1049,12 @@ export default function App() {
         if (pc.iceConnectionState === "failed") {
           // Auto-skip if partner drops off and connection definitively fails
           console.warn("[WebRTC] WebRTC connection failed.");
-          addSystemMessage("Connection failed. Try testing on two different networks (e.g. mobile vs wifi) if testing locally!");
-          setTimeout(() => handleSkipMatch(), 3500);
+          addSystemMessage("P2P Local Connection failed (due to missing TURN server over NAT). Switching to a simulated mock video feed so you can preview the UI layout!");
+          if (chatMode === "video") {
+            createMockRemoteMediaStream(partnerId);
+          } else {
+            setTimeout(() => handleSkipMatch(), 3500);
+          }
         } else if (pc.iceConnectionState === "disconnected") {
           console.warn(
             "[WebRTC] WebRTC connection temporarily disconnected. Waiting to see if it recovers.",
