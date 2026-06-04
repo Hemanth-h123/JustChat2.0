@@ -1045,6 +1045,17 @@ export default function App() {
           console.warn(
             "[WebRTC] WebRTC connection temporarily disconnected. Waiting to see if it recovers.",
           );
+          (window as any)._iceDisconnectTimeout = setTimeout(() => {
+             if (peerConnectionRef.current?.iceConnectionState === "disconnected") {
+                 console.warn("[WebRTC] Connection did not recover. Skipping.");
+                 handleSkipMatch();
+             }
+          }, 7000);
+        } else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+           if ((window as any)._iceDisconnectTimeout) {
+               clearTimeout((window as any)._iceDisconnectTimeout);
+               (window as any)._iceDisconnectTimeout = null;
+           }
         }
       };
 
@@ -1159,6 +1170,10 @@ export default function App() {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
+    }
+    if ((window as any)._iceDisconnectTimeout) {
+      clearTimeout((window as any)._iceDisconnectTimeout);
+      (window as any)._iceDisconnectTimeout = null;
     }
     if ((window as any)._remoteSimIntervalId) {
       clearInterval((window as any)._remoteSimIntervalId);

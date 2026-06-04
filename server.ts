@@ -79,8 +79,8 @@ let cleanupRoomIterator = rooms.keys();
 setInterval(() => {
   const now = Date.now();
   
-  // Clean up to 5000 users per tick
-  for (let i = 0; i < 5000; i++) {
+  // Clean up to 25000 users per tick
+  for (let i = 0; i < 25000; i++) {
     const next = cleanupUserIterator.next();
     if (next.done) {
       cleanupUserIterator = activeUsers.keys();
@@ -88,17 +88,17 @@ setInterval(() => {
     }
     const userId = next.value;
     const user = activeUsers.get(userId);
-    if (user && now - user.lastSeen > 7000) {
+    if (user && now - user.lastSeen > 12000) {
       if (user.roomId) {
         closeRoom(user.roomId, userId);
       }
       removeUser(userId);
-      console.log(`[Server] Cleaned up offline user ${userId}`);
+      // Removed log to avoid spam at 1 million users
     }
   }
   
-  // Clean up to 1000 rooms per tick
-  for (let i = 0; i < 1000; i++) {
+  // Clean up to 15000 rooms per tick
+  for (let i = 0; i < 15000; i++) {
     const next = cleanupRoomIterator.next();
     if (next.done) {
       cleanupRoomIterator = rooms.keys();
@@ -348,7 +348,7 @@ async function startServer() {
         !otherId.startsWith('sim_')
       ) {
         const other = activeUsers.get(otherId);
-        if (other && other.status === 'matching' && (Date.now() - other.lastSeen < 7000 || other.id.startsWith("sim_"))) {
+        if (other && other.status === 'matching' && (Date.now() - other.lastSeen < 12000 || other.id.startsWith("sim_"))) {
           matchPool.push(other);
           // Limit to 20 viable candidates to avoid iteration slowdowns
           if (matchPool.length >= 20) break;
@@ -366,7 +366,7 @@ async function startServer() {
       for (const otherId of pool) {
         if (otherId !== userId && !otherId.startsWith('sim_')) {
           const other = activeUsers.get(otherId);
-          if (other && other.status === 'matching' && (Date.now() - other.lastSeen < 7000 || other.id.startsWith("sim_"))) {
+          if (other && other.status === 'matching' && (Date.now() - other.lastSeen < 12000 || other.id.startsWith("sim_"))) {
              allOtherMatchingRealUsers.push(other);
              if (allOtherMatchingRealUsers.length >= 5) break;
           }
@@ -696,6 +696,9 @@ async function startServer() {
     };
 
     reports.push(newReport);
+    if (reports.length > 5000) {
+      reports.shift();
+    }
     console.log(`[Moderation] New Report on user ${reportedUserId} from reporter ${userId} for reason: ${reason}`);
 
     if (reporter && reporter.roomId) {
