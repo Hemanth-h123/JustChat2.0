@@ -46,36 +46,78 @@ interface Report {
 
 const activeUsers = new Map<string, User>();
 const rooms = new Map<string, Room>();
+const matchingPoolVideo = new Set<string>();
+const matchingPoolText = new Set<string>();
 const reports: Report[] = [];
 const bannedUsers = new Set<string>();
 
-// Helper to clean up offline users
+function setUserStatus(user: User, status: 'idle' | 'matching' | 'active', chatMode?: 'video' | 'text' | null) {
+  user.status = status;
+  if (chatMode !== undefined) {
+    user.chatMode = chatMode;
+  }
+  
+  matchingPoolVideo.delete(user.id);
+  matchingPoolText.delete(user.id);
+
+  if (status === 'matching') {
+    if (user.chatMode === 'video') matchingPoolVideo.add(user.id);
+    else if (user.chatMode === 'text') matchingPoolText.add(user.id);
+  }
+}
+
+function removeUser(userId: string) {
+  matchingPoolVideo.delete(userId);
+  matchingPoolText.delete(userId);
+  activeUsers.delete(userId);
+}
+
+// Helper to clean up offline users incrementally
+let cleanupUserIterator = activeUsers.keys();
+let cleanupRoomIterator = rooms.keys();
+
 setInterval(() => {
   const now = Date.now();
-  for (const [userId, user] of activeUsers.entries()) {
-    // If user hasn't polled status for > 7 seconds
-    if (now - user.lastSeen > 7000) {
-      // Clean up user's room
+  
+  // Clean up to 5000 users per tick
+  for (let i = 0; i < 5000; i++) {
+    const next = cleanupUserIterator.next();
+    if (next.done) {
+      cleanupUserIterator = activeUsers.keys();
+      break;
+    }
+    const userId = next.value;
+    const user = activeUsers.get(userId);
+    if (user && now - user.lastSeen > 7000) {
       if (user.roomId) {
         closeRoom(user.roomId, userId);
       }
-      activeUsers.delete(userId);
+      removeUser(userId);
       console.log(`[Server] Cleaned up offline user ${userId}`);
     }
   }
   
-  // Clean up stale rooms
-  for (const [roomId, room] of rooms.entries()) {
-    const hostActive = activeUsers.has(room.hostId);
-    const guestActive = activeUsers.has(room.guestId);
-    
-    if (!hostActive && !guestActive) {
-      rooms.delete(roomId);
-    } else if (now - room.lastActivity > 300000) { // 5 minutes inactivity
-      rooms.delete(roomId);
+  // Clean up to 1000 rooms per tick
+  for (let i = 0; i < 1000; i++) {
+    const next = cleanupRoomIterator.next();
+    if (next.done) {
+      cleanupRoomIterator = rooms.keys();
+      break;
+    }
+    const roomId = next.value;
+    const room = rooms.get(roomId);
+    if (room) {
+      const hostActive = activeUsers.has(room.hostId);
+      const guestActive = activeUsers.has(room.guestId);
+      
+      if (!hostActive && !guestActive) {
+        rooms.delete(roomId);
+      } else if (now - room.lastActivity > 300000) { // 5 minutes inactivity
+        rooms.delete(roomId);
+      }
     }
   }
-}, 5000);
+}, 500);
 
 function closeRoom(roomId: string, leavingUserId: string) {
   const room = rooms.get(roomId);
@@ -88,7 +130,7 @@ function closeRoom(roomId: string, leavingUserId: string) {
 
     if (partner) {
       partner.roomId = null;
-      partner.status = 'idle';
+      setUserStatus(partner, 'idle');
       partner.lastPartnerId = leavingUserId;
     }
     rooms.delete(roomId);
@@ -185,7 +227,7 @@ async function startServer() {
       } else {
         // Room disappeared/stale
         user.roomId = null;
-        user.status = 'idle';
+        setUserStatus(user, 'idle');
       }
     }
 
@@ -240,8 +282,7 @@ async function startServer() {
       if (user.roomId) {
         closeRoom(user.roomId, userId);
       }
-      user.status = 'idle';
-      user.chatMode = null;
+      setUserStatus(user, 'idle', null);
     }
 
     res.json({ success: true });
@@ -280,7 +321,7 @@ async function startServer() {
       } else {
         // Stale room
         user.roomId = null;
-        user.status = 'matching';
+        setUserStatus(user, 'matching');
       }
     }
 
@@ -290,27 +331,49 @@ async function startServer() {
     }
 
     if (user.status !== 'matching') {
-      user.status = 'matching';
+      setUserStatus(user, 'matching');
       user.matchingStartedAt = Date.now();
     }
     user.lastSeen = Date.now();
 
     // Matchmaking Logic: Find other matching real users with the SAME chat mode (video or text)
-    let matchPool = Array.from(activeUsers.values()).filter(
-      other => other.id !== userId && 
-               other.status === 'matching' && 
-               other.chatMode === user.chatMode &&
-               !other.id.startsWith('sim_') &&
-               other.id !== user.lastPartnerId 
-    );
+    // To prevent O(N) full-table scans that would crash the server at scale, use the matching pools.
+    let matchPool: User[] = [];
+    const pool = user.chatMode === 'video' ? matchingPoolVideo : matchingPoolText;
+    
+    for (const otherId of pool) {
+      if (
+        otherId !== userId &&
+        otherId !== user.lastPartnerId &&
+        !otherId.startsWith('sim_')
+      ) {
+        const other = activeUsers.get(otherId);
+        if (other && other.status === 'matching' && (Date.now() - other.lastSeen < 7000 || other.id.startsWith("sim_"))) {
+          matchPool.push(other);
+          // Limit to 20 viable candidates to avoid iteration slowdowns
+          if (matchPool.length >= 20) break;
+        } else {
+          // Cleanup stale or inactive entries
+          pool.delete(otherId);
+        }
+      }
+    }
 
     // Fallback: If no strict match found, check if there is only 1 other user matching
     if (matchPool.length === 0) {
-      const allOtherMatchingRealUsers = Array.from(activeUsers.values()).filter(
-        other => other.id !== userId &&
-                 other.status === 'matching' &&
-                 !other.id.startsWith('sim_')
-      );
+      const allOtherMatchingRealUsers = [];
+      let fbCount = 0;
+      for (const otherId of pool) {
+        if (otherId !== userId && !otherId.startsWith('sim_')) {
+          const other = activeUsers.get(otherId);
+          if (other && other.status === 'matching' && (Date.now() - other.lastSeen < 7000 || other.id.startsWith("sim_"))) {
+             allOtherMatchingRealUsers.push(other);
+             if (allOtherMatchingRealUsers.length >= 5) break;
+          }
+        }
+        fbCount++;
+        if (fbCount > 5000) break;
+      }
       
       const now = Date.now();
       const userWaitTime = now - (user.matchingStartedAt || now);
@@ -354,11 +417,11 @@ async function startServer() {
 
       rooms.set(roomId, newRoom);
 
-      user.status = 'active';
+      setUserStatus(user, 'active');
       user.roomId = roomId;
       user.matchingStartedAt = undefined;
 
-      chosenPartner.status = 'active';
+      setUserStatus(chosenPartner, 'active');
       chosenPartner.roomId = roomId;
       chosenPartner.matchingStartedAt = undefined;
 
@@ -387,24 +450,24 @@ async function startServer() {
         rooms.delete(user.roomId);
 
         user.roomId = null;
-        user.status = 'matching';
+        setUserStatus(user, 'matching');
         user.matchingStartedAt = Date.now();
         user.lastPartnerId = partnerId;
 
         if (partner) {
           partner.roomId = null;
-          partner.status = 'matching';
+          setUserStatus(partner, 'matching');
           partner.matchingStartedAt = Date.now();
           partner.lastPartnerId = userId;
           console.log(`[Server] Skip: Both ${user.name} and ${partner.name} placed back into matching queue.`);
         }
       } else {
         user.roomId = null;
-        user.status = 'matching';
+        setUserStatus(user, 'matching');
         user.matchingStartedAt = Date.now();
       }
     } else {
-      user.status = 'matching';
+      setUserStatus(user, 'matching');
       user.matchingStartedAt = Date.now();
     }
 
@@ -428,27 +491,24 @@ async function startServer() {
         rooms.delete(user.roomId);
 
         user.roomId = null;
-        user.status = 'idle';
-        user.chatMode = null;
+        setUserStatus(user, 'idle', null);
         user.matchingStartedAt = undefined;
         user.lastPartnerId = partnerId;
 
         if (partner) {
           partner.roomId = null;
-          partner.status = 'matching';
+          setUserStatus(partner, 'matching');
           partner.matchingStartedAt = Date.now();
           partner.lastPartnerId = userId;
           console.log(`[Server] End Call: ${user.name} returned to home. Partner ${partner.name} placed back in matching queue.`);
         }
       } else {
         user.roomId = null;
-        user.status = 'idle';
-        user.chatMode = null;
+        setUserStatus(user, 'idle', null);
         user.matchingStartedAt = undefined;
       }
     } else {
-      user.status = 'idle';
-      user.chatMode = null;
+      setUserStatus(user, 'idle', null);
       user.matchingStartedAt = undefined;
     }
 
@@ -658,10 +718,10 @@ async function startServer() {
       };
     });
 
-    res.json({
-      success: true,
-      reports: enrichedReports,
-      onlineUsers: Array.from(activeUsers.values()).map(u => ({
+    const onlineUsers = [];
+    let count = 0;
+    for (const u of activeUsers.values()) {
+      onlineUsers.push({
         id: u.id,
         name: u.name,
         interests: u.interests,
@@ -669,7 +729,15 @@ async function startServer() {
         ageVerified: u.ageVerified,
         status: u.status,
         isBanned: bannedUsers.has(u.id)
-      })),
+      });
+      count++;
+      if (count >= 500) break;
+    }
+
+    res.json({
+      success: true,
+      reports: enrichedReports,
+      onlineUsers,
       bannedList: Array.from(bannedUsers)
     });
   });
@@ -689,7 +757,7 @@ async function startServer() {
       if (userObj.roomId) {
         closeRoom(userObj.roomId, targetUserId);
       }
-      activeUsers.delete(targetUserId);
+      removeUser(targetUserId);
     }
 
     res.json({ success: true, bannedUsers: Array.from(bannedUsers) });

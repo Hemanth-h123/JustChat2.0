@@ -788,11 +788,13 @@ export default function App() {
   };
 
   // Sync state & messages with server
+  const isPollingStatusRef = useRef(false);
   useEffect(() => {
     if (!isAgeVerified) return;
 
     const interval = setInterval(async () => {
-      if (isTransitioningRef.current) return;
+      if (isTransitioningRef.current || isPollingStatusRef.current) return;
+      isPollingStatusRef.current = true;
       try {
         const response = await appFetch("/api/status", {
           headers: { "x-user-id": userId },
@@ -908,6 +910,8 @@ export default function App() {
         ) {
           console.error("Poller status failure:", err);
         }
+      } finally {
+        isPollingStatusRef.current = false;
       }
     }, 1500);
 
@@ -922,11 +926,14 @@ export default function App() {
     roomId,
   ]);
 
-  // Periodic automated matchmaking scans (Check matching list every 3s so users pair instantly)
+  // Periodic automated matchmaking scans
+  const isPollingMatchRef = useRef(false);
   useEffect(() => {
     if (status !== "matching" || !chatMode) return;
 
     const interval = setInterval(async () => {
+      if (isPollingMatchRef.current) return;
+      isPollingMatchRef.current = true;
       try {
         console.log(
           `[Queue] Checking matchmaking candidates for mode: ${chatMode}`,
@@ -953,6 +960,8 @@ export default function App() {
         ) {
           console.warn("Queue loop scan fail:", err);
         }
+      } finally {
+        isPollingMatchRef.current = false;
       }
     }, 3000);
 
@@ -1064,6 +1073,7 @@ export default function App() {
     }
   };
 
+  const isPollingSignalRef = useRef(false);
   const pollIceAndSdp = (role: "host" | "guest") => {
     if ((window as any)._signalIntervalId) {
       clearInterval((window as any)._signalIntervalId);
@@ -1072,11 +1082,14 @@ export default function App() {
     const processedIce = new Set<string>();
 
     const signalInterval = setInterval(async () => {
-      const pc = peerConnectionRef.current;
-      if (!pc) {
-        clearInterval(signalInterval);
-        return;
-      }
+      if (isPollingSignalRef.current) return;
+      isPollingSignalRef.current = true;
+      try {
+        const pc = peerConnectionRef.current;
+        if (!pc) {
+          clearInterval(signalInterval);
+          return;
+        }
 
       try {
         const res = await appFetch(`/api/signal/poll?role=${role}`, {
@@ -1131,7 +1144,12 @@ export default function App() {
         ) {
           console.warn("Signaling poll failed:", err);
         }
+      } finally {
+        isPollingSignalRef.current = false;
       }
+    } catch {
+      isPollingSignalRef.current = false;
+    }
     }, 1500);
     (window as any)._signalIntervalId = signalInterval;
   };
