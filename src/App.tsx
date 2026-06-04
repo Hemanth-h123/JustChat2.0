@@ -755,14 +755,32 @@ export default function App() {
     }
   }, [localStream, status, chatMode]);
 
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+        localVideoRef.current.play().catch((e) => {
+          if (e.name !== "AbortError") {
+            console.warn("Autoplay blocked for local stream:", e);
+          }
+        });
+      }
+    }
+  }, [localStream, status, chatMode]);
+
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       if (remoteVideoRef.current.srcObject !== remoteStream) {
         remoteVideoRef.current.srcObject = remoteStream;
         // Only try to play if we just attached it
-        remoteVideoRef.current.play().catch((e) => {
+        remoteVideoRef.current.play().then(() => {
+          setAutoplayBlocked(false);
+        }).catch((e) => {
           if (e.name !== "AbortError") {
             console.warn("Autoplay blocked for remote stream:", e);
+            setAutoplayBlocked(true);
           }
         });
       }
@@ -976,16 +994,9 @@ export default function App() {
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
-          {
-            urls: "turn:openrelay.metered.ca:80",
-            username: "openrelayproject",
-            credential: "openrelayproject",
-          },
-          {
-            urls: "turn:openrelay.metered.ca:443?transport=tcp",
-            username: "openrelayproject",
-            credential: "openrelayproject",
-          },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun4.l.google.com:19302" },
         ],
       };
 
@@ -1008,7 +1019,7 @@ export default function App() {
             if (!stream.getTracks().includes(event.track)) {
               stream.addTrack(event.track);
             }
-            return stream;
+            return new MediaStream(stream.getTracks());
           });
         }
       };
@@ -2001,12 +2012,25 @@ export default function App() {
                         className={`w-full h-full flex items-center justify-center bg-black/40 rounded overflow-hidden relative border border-white/5 my-0.5 max-lg:m-0`}
                       >
                         {remoteStream ? (
-                          <video
-                            ref={remoteVideoRef}
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-contain sm:object-cover"
-                          />
+                          <>
+                            <video
+                              ref={remoteVideoRef}
+                              autoPlay
+                              playsInline
+                              className="w-full h-full object-contain sm:object-cover"
+                            />
+                            {autoplayBlocked && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50">
+                                <span className="text-white text-xs font-mono mb-2">Browser Blocked AutoPlay</span>
+                                <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-mono font-bold" onClick={() => {
+                                  remoteVideoRef.current?.play();
+                                  setAutoplayBlocked(false);
+                                }}>
+                                  Click to Unmute / Play
+                                </button>
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-650 text-[10px] font-mono text-center p-2">
                             <span className="animate-pulse flex h-2 w-2 rounded-full bg-orange-400 mb-1" />
